@@ -41,6 +41,7 @@ export default function DashboardClient({ children, userName, userEmail }: Dashb
           userEmail={userEmail}
           collapsed={false}
           onToggle={() => setMobileOpen(false)}
+          onNavClick={() => setMobileOpen(false)}
         />
       </div>
 

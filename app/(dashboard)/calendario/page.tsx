@@ -65,10 +65,6 @@ export default function CalendarioPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-4 text-xs">
-            <span className="text-green-400 font-semibold">+{formatCurrency(totalMesReceitas)}</span>
-            <span className="text-rose-400 font-semibold">-{formatCurrency(totalMesDespesas)}</span>
-          </div>
           <div className="flex items-center gap-1">
             <button onClick={() => setCurrentDate(subMonths(currentDate, 1))} className="p-2 rounded-xl text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors">
               <ChevronLeft className="w-4 h-4" />

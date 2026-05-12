@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Toaster } from 'sonner'
+import { ThemeProvider } from '@/components/theme-provider'
 import './globals.css'
 
 const geistSans = Geist({
@@ -21,8 +22,9 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR" className={`${geistSans.variable} ${geistMono.variable} h-full`}>
+    <html lang="pt-BR" className={`${geistSans.variable} ${geistMono.variable} h-full`} data-theme="dark">
       <body className="min-h-full bg-[#09090b] text-zinc-50 antialiased">
+        <ThemeProvider>
         {children}
         <Toaster
           position="bottom-right"
@@ -35,6 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
           theme="dark"
         />
+        </ThemeProvider>
       </body>
     </html>
   )

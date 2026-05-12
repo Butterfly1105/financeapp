@@ -7,12 +7,11 @@ import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import {
   LayoutDashboard, FolderOpen, TrendingUp, PieChart, BarChart2,
-  Target, Calendar, Settings, LogOut, TrendingDown, ChevronLeft, ChevronRight,
-  Wallet, Menu, X
+  Target, Calendar, Settings, LogOut, ChevronLeft, ChevronRight,
+  Wallet, Tag, Grid3X3
 } from 'lucide-react'
-import { useState } from 'react'
 
-const navItems = [
+const mainNavItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/pastas', label: 'Pastas', icon: FolderOpen },
   { href: '/transacoes', label: 'Transações', icon: Wallet },
@@ -23,14 +22,20 @@ const navItems = [
   { href: '/calendario', label: 'Calendário', icon: Calendar },
 ]
 
+const manageNavItems = [
+  { href: '/categorias', label: 'Categorias', icon: Grid3X3 },
+  { href: '/tags', label: 'Tags', icon: Tag },
+]
+
 interface SidebarProps {
   userName?: string
   userEmail?: string
   collapsed?: boolean
   onToggle?: () => void
+  onNavClick?: () => void
 }
 
-export function Sidebar({ userName, userEmail, collapsed = false, onToggle }: SidebarProps) {
+export function Sidebar({ userName, userEmail, collapsed = false, onToggle, onNavClick }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
 
@@ -45,6 +50,27 @@ export function Sidebar({ userName, userEmail, collapsed = false, onToggle }: Si
   const initials = userName
     ? userName.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()
     : 'U'
+
+  function NavLink({ href, label, icon: Icon }: { href: string; label: string; icon: any }) {
+    const isActive = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
+    return (
+      <Link
+        href={href}
+        onClick={onNavClick}
+        title={collapsed ? label : undefined}
+        className={cn(
+          'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150',
+          collapsed ? 'justify-center' : '',
+          isActive
+            ? 'bg-indigo-500/10 text-indigo-300 border border-indigo-500/15'
+            : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
+        )}
+      >
+        <Icon className={cn('flex-shrink-0', collapsed ? 'w-5 h-5' : 'w-4 h-4', isActive ? 'text-indigo-400' : '')} />
+        {!collapsed && <span>{label}</span>}
+      </Link>
+    )
+  }
 
   return (
     <aside
@@ -84,47 +110,25 @@ export function Sidebar({ userName, userEmail, collapsed = false, onToggle }: Si
             Principal
           </p>
         )}
-        {navItems.map(item => {
-          const Icon = item.icon
-          const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href))
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              title={collapsed ? item.label : undefined}
-              className={cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150',
-                collapsed ? 'justify-center' : '',
-                isActive
-                  ? 'bg-indigo-500/10 text-indigo-300 border border-indigo-500/15'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
-              )}
-            >
-              <Icon className={cn('flex-shrink-0', collapsed ? 'w-5 h-5' : 'w-4 h-4', isActive ? 'text-indigo-400' : '')} />
-              {!collapsed && <span>{item.label}</span>}
-            </Link>
-          )
-        })}
+        {mainNavItems.map(item => <NavLink key={item.href} {...item} />)}
 
-        {!collapsed && (
-          <p className="px-3 py-1.5 text-[10px] font-semibold text-zinc-600 uppercase tracking-wider mt-4">
-            Conta
-          </p>
-        )}
-        <Link
-          href="/configuracoes"
-          title={collapsed ? 'Configurações' : undefined}
-          className={cn(
-            'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150',
-            collapsed ? 'justify-center' : '',
-            pathname.startsWith('/configuracoes')
-              ? 'bg-indigo-500/10 text-indigo-300 border border-indigo-500/15'
-              : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
+        <div className="pt-2">
+          {!collapsed && (
+            <p className="px-3 py-1.5 text-[10px] font-semibold text-zinc-600 uppercase tracking-wider">
+              Gerenciar
+            </p>
           )}
-        >
-          <Settings className={cn('flex-shrink-0', collapsed ? 'w-5 h-5' : 'w-4 h-4')} />
-          {!collapsed && <span>Configurações</span>}
-        </Link>
+          {manageNavItems.map(item => <NavLink key={item.href} {...item} />)}
+        </div>
+
+        <div className="pt-2">
+          {!collapsed && (
+            <p className="px-3 py-1.5 text-[10px] font-semibold text-zinc-600 uppercase tracking-wider">
+              Conta
+            </p>
+          )}
+          <NavLink href="/configuracoes" label="Configurações" icon={Settings} />
+        </div>
       </nav>
 
       {/* User section */}
