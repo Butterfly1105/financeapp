@@ -20,6 +20,7 @@ import type { Transaction, Goal } from '@/lib/types'
 
 interface MonthlyData { mes: string; receitas: number; despesas: number }
 interface CategoryData { name: string; value: number; color: string }
+type ChartType = 'despesa' | 'receita'
 
 const quickOptions = [
   { label: 'Receita', href: '/transacoes', icon: ArrowUpRight, color: 'text-green-400', bg: 'bg-green-500/10 border-green-500/20', desc: 'Nova receita' },
@@ -43,6 +44,8 @@ export default function DashboardPage() {
   const [despesasAnterior, setDespesasAnterior] = useState(0)
   const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([])
   const [categoryData, setCategoryData] = useState<CategoryData[]>([])
+  const [categoryRecData, setCategoryRecData] = useState<CategoryData[]>([])
+  const [chartType, setChartType] = useState<ChartType>('despesa')
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([])
   const [goals, setGoals] = useState<Goal[]>([])
   const [showQuickCreate, setShowQuickCreate] = useState(false)
@@ -92,15 +95,28 @@ export default function DashboardPage() {
     }
     setMonthlyData(monthsData)
 
-    const { data: catData } = await supabase.from('transacoes').select('valor, categorias(nome, cor)').eq('user_id', user.id).eq('tipo', 'despesa').gte('data', mesStart).lte('data', mesEnd).eq('status', 'pago')
+    const [catDespResult, catRecResult] = await Promise.all([
+      supabase.from('transacoes').select('valor, categorias(nome, cor)').eq('user_id', user.id).eq('tipo', 'despesa').gte('data', mesStart).lte('data', mesEnd).eq('status', 'pago'),
+      supabase.from('transacoes').select('valor, categorias(nome, cor)').eq('user_id', user.id).eq('tipo', 'receita').gte('data', mesStart).lte('data', mesEnd).eq('status', 'pago'),
+    ])
+
     const catMap: Record<string, { value: number; color: string }> = {}
-    catData?.forEach((t: any) => {
+    catDespResult.data?.forEach((t: any) => {
       const cat = t.categorias?.nome || 'Outros'
       const cor = t.categorias?.cor || '#71717a'
       if (!catMap[cat]) catMap[cat] = { value: 0, color: cor }
       catMap[cat].value += Number(t.valor)
     })
     setCategoryData(Object.entries(catMap).map(([name, { value, color }]) => ({ name, value, color })).sort((a, b) => b.value - a.value).slice(0, 6))
+
+    const catRecMap: Record<string, { value: number; color: string }> = {}
+    catRecResult.data?.forEach((t: any) => {
+      const cat = t.categorias?.nome || 'Outros'
+      const cor = t.categorias?.cor || '#22c55e'
+      if (!catRecMap[cat]) catRecMap[cat] = { value: 0, color: cor }
+      catRecMap[cat].value += Number(t.valor)
+    })
+    setCategoryRecData(Object.entries(catRecMap).map(([name, { value, color }]) => ({ name, value, color })).sort((a, b) => b.value - a.value).slice(0, 6))
 
     const { data: recent } = await supabase.from('transacoes').select('*, categorias(nome, cor)').eq('user_id', user.id).order('data', { ascending: false }).order('created_at', { ascending: false }).limit(6)
     setRecentTransactions((recent || []) as any)
@@ -263,16 +279,28 @@ export default function DashboardPage() {
         </div>
 
         <div className="bg-[#18181b] border border-zinc-800 rounded-2xl p-5">
-          <div className="mb-4">
-            <h3 className="font-semibold text-zinc-100">Por Categoria</h3>
-            <p className="text-xs text-zinc-500 mt-0.5">Despesas do mês</p>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="font-semibold text-zinc-100">Por Categoria</h3>
+              <p className="text-xs text-zinc-500 mt-0.5">{chartType === 'despesa' ? 'Despesas' : 'Receitas'} do mês</p>
+            </div>
+            <div className="flex bg-zinc-800 rounded-lg p-0.5 gap-0.5">
+              <button onClick={() => setChartType('despesa')}
+                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${chartType === 'despesa' ? 'bg-rose-500/20 text-rose-400' : 'text-zinc-500 hover:text-zinc-300'}`}>
+                Desp
+              </button>
+              <button onClick={() => setChartType('receita')}
+                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${chartType === 'receita' ? 'bg-green-500/20 text-green-400' : 'text-zinc-500 hover:text-zinc-300'}`}>
+                Rec
+              </button>
+            </div>
           </div>
-          {categoryData.length > 0 ? (
+          {(chartType === 'despesa' ? categoryData : categoryRecData).length > 0 ? (
             <>
               <ResponsiveContainer width="100%" height={140}>
                 <PieChart>
-                  <Pie data={categoryData} cx="50%" cy="50%" innerRadius={40} outerRadius={65} paddingAngle={3} dataKey="value">
-                    {categoryData.map((entry, index) => (
+                  <Pie data={chartType === 'despesa' ? categoryData : categoryRecData} cx="50%" cy="50%" innerRadius={40} outerRadius={65} paddingAngle={3} dataKey="value">
+                    {(chartType === 'despesa' ? categoryData : categoryRecData).map((entry, index) => (
                       <Cell key={index} fill={entry.color} />
                     ))}
                   </Pie>
@@ -280,7 +308,7 @@ export default function DashboardPage() {
                 </PieChart>
               </ResponsiveContainer>
               <div className="space-y-2 mt-3">
-                {categoryData.slice(0, 4).map(cat => (
+                {(chartType === 'despesa' ? categoryData : categoryRecData).slice(0, 4).map(cat => (
                   <div key={cat.name} className="flex items-center justify-between">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: cat.color }} />
@@ -293,7 +321,7 @@ export default function DashboardPage() {
             </>
           ) : (
             <div className="flex items-center justify-center h-40 text-zinc-600 text-sm">
-              Nenhuma despesa no mês
+              {chartType === 'despesa' ? 'Nenhuma despesa' : 'Nenhuma receita'} no mês
             </div>
           )}
         </div>

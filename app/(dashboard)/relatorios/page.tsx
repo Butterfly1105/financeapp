@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { formatCurrency } from '@/lib/utils'
-import { BarChart2, Download, TrendingUp, TrendingDown, Wallet, FolderOpen } from 'lucide-react'
+import { formatCurrency, formatCurrencyCompact, formatDateShort } from '@/lib/utils'
+import { BarChart2, Download, TrendingUp, TrendingDown, Wallet, FolderOpen, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import {
   BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell,
   ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid
@@ -108,9 +108,21 @@ export default function RelatoriosPage() {
       months.push({ mes: label, receitas: rec, despesas: desp, saldo: rec - desp })
     }
 
-    const { data: allTxs } = await supabase.from('transacoes').select('*, categorias(nome, cor)').eq('user_id', user.id).eq('pasta_id', selectedPasta).order('data', { ascending: false }).limit(50)
+    const { data: allTxs } = await supabase
+      .from('transacoes')
+      .select('*, categorias(nome, cor)')
+      .eq('user_id', user.id)
+      .eq('pasta_id', selectedPasta)
+      .order('data', { ascending: false })
+      .order('tipo')
+      .limit(200)
+
     const pastaNome = pastas.find(p => p.id === selectedPasta)?.nome || ''
-    setPastaData({ months, sumRec, sumDesp, allTxs: allTxs || [], pastaNome })
+
+    const despesas = (allTxs || []).filter((t: any) => t.tipo === 'despesa')
+    const receitas = (allTxs || []).filter((t: any) => t.tipo === 'receita')
+
+    setPastaData({ months, sumRec, sumDesp, allTxs: allTxs || [], despesas, receitas, pastaNome })
     setLoadingPasta(false)
   }
 
@@ -118,14 +130,63 @@ export default function RelatoriosPage() {
 
   function exportCSV(data: any[], filename: string) {
     if (!data.length) return
-    const headers = Object.keys(data[0]).join(',')
-    const rows = data.map(row => Object.values(row).map(v => `"${v}"`).join(',')).join('\n')
-    const csv = `${headers}\n${rows}`
-    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+    const headers = Object.keys(data[0]).join(';')
+    const rows = data.map(row => Object.values(row).map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\n')
+    const csv = `﻿${headers}\n${rows}`
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url; a.download = filename; a.click()
     URL.revokeObjectURL(url)
+  }
+
+  function exportPastaReport() {
+    if (!pastaData) return
+    const rows: any[] = []
+
+    rows.push({ Tipo: '--- DESPESAS ---', Descrição: '', Categoria: '', Data: '', Valor: '', Total: '' })
+    pastaData.despesas.forEach((tx: any) => {
+      rows.push({
+        Tipo: 'Despesa',
+        Descrição: tx.descricao,
+        Categoria: tx.categorias?.nome || 'Sem categoria',
+        Data: formatDateShort(tx.data),
+        Valor: `R$ ${Number(tx.valor).toFixed(2).replace('.', ',')}`,
+        Total: '',
+      })
+    })
+    const totalDesp = pastaData.despesas.reduce((s: number, t: any) => s + Number(t.valor), 0)
+    rows.push({ Tipo: 'TOTAL DESPESAS', Descrição: '', Categoria: '', Data: '', Valor: '', Total: `R$ ${totalDesp.toFixed(2).replace('.', ',')}` })
+
+    rows.push({ Tipo: '', Descrição: '', Categoria: '', Data: '', Valor: '', Total: '' })
+    rows.push({ Tipo: '--- RECEITAS ---', Descrição: '', Categoria: '', Data: '', Valor: '', Total: '' })
+    pastaData.receitas.forEach((tx: any) => {
+      rows.push({
+        Tipo: 'Receita',
+        Descrição: tx.descricao,
+        Categoria: tx.categorias?.nome || 'Sem categoria',
+        Data: formatDateShort(tx.data),
+        Valor: `R$ ${Number(tx.valor).toFixed(2).replace('.', ',')}`,
+        Total: '',
+      })
+    })
+    const totalRec = pastaData.receitas.reduce((s: number, t: any) => s + Number(t.valor), 0)
+    rows.push({ Tipo: 'TOTAL RECEITAS', Descrição: '', Categoria: '', Data: '', Valor: '', Total: `R$ ${totalRec.toFixed(2).replace('.', ',')}` })
+    rows.push({ Tipo: 'SALDO', Descrição: '', Categoria: '', Data: '', Valor: '', Total: `R$ ${(totalRec - totalDesp).toFixed(2).replace('.', ',')}` })
+
+    exportCSV(rows, `relatorio-pasta-${pastaData.pastaNome}.csv`)
+  }
+
+  function exportGeralReport() {
+    exportCSV(
+      monthlyData.map(d => ({
+        'Mês': d.mes,
+        'Receitas': `R$ ${d.receitas.toFixed(2).replace('.', ',')}`,
+        'Despesas': `R$ ${d.despesas.toFixed(2).replace('.', ',')}`,
+        'Saldo': `R$ ${d.saldo.toFixed(2).replace('.', ',')}`,
+      })),
+      `relatorio-geral-${period}meses.csv`
+    )
   }
 
   const customTooltip = ({ active, payload, label }: any) => {
@@ -160,13 +221,12 @@ export default function RelatoriosPage() {
               </button>
             ))}
           </div>
-          <button
-            onClick={() => exportCSV(monthlyData.map(d => ({ Mês: d.mes, Receitas: d.receitas.toFixed(2), Despesas: d.despesas.toFixed(2), Saldo: d.saldo.toFixed(2) })), `relatorio-${period}meses.csv`)}
-            className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-2 rounded-xl text-sm font-medium transition-colors border border-zinc-700"
-          >
-            <Download className="w-4 h-4" />
-            <span className="hidden sm:inline">Exportar CSV</span>
-          </button>
+          {tab === 'geral' && (
+            <button onClick={exportGeralReport}
+              className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-2 rounded-xl text-sm font-medium transition-colors border border-zinc-700">
+              <Download className="w-4 h-4" /><span className="hidden sm:inline">Exportar</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -190,17 +250,17 @@ export default function RelatoriosPage() {
           <div className="grid grid-cols-3 gap-3 mb-6">
             <div className="bg-[#18181b] border border-zinc-800 rounded-2xl p-4">
               <div className="flex items-center gap-2 mb-2"><TrendingUp className="w-4 h-4 text-green-400" /><span className="text-xs text-zinc-500">Total Receitas</span></div>
-              <p className="text-base md:text-xl font-bold text-green-400 truncate">{formatCurrency(totalReceitas)}</p>
+              <p className="text-base md:text-xl font-bold text-green-400">{formatCurrencyCompact(totalReceitas)}</p>
               <p className="text-xs text-zinc-600 mt-0.5">{period} meses</p>
             </div>
             <div className="bg-[#18181b] border border-zinc-800 rounded-2xl p-4">
               <div className="flex items-center gap-2 mb-2"><TrendingDown className="w-4 h-4 text-rose-400" /><span className="text-xs text-zinc-500">Total Despesas</span></div>
-              <p className="text-base md:text-xl font-bold text-rose-400 truncate">{formatCurrency(totalDespesas)}</p>
+              <p className="text-base md:text-xl font-bold text-rose-400">{formatCurrencyCompact(totalDespesas)}</p>
               <p className="text-xs text-zinc-600 mt-0.5">{period} meses</p>
             </div>
             <div className="bg-[#18181b] border border-zinc-800 rounded-2xl p-4">
               <div className="flex items-center gap-2 mb-2"><Wallet className={`w-4 h-4 ${saldoMedio >= 0 ? 'text-blue-400' : 'text-rose-400'}`} /><span className="text-xs text-zinc-500">Saldo médio/mês</span></div>
-              <p className={`text-base md:text-xl font-bold truncate ${saldoMedio >= 0 ? 'text-blue-400' : 'text-rose-400'}`}>{formatCurrency(saldoMedio)}</p>
+              <p className={`text-base md:text-xl font-bold ${saldoMedio >= 0 ? 'text-blue-400' : 'text-rose-400'}`}>{formatCurrencyCompact(saldoMedio)}</p>
               <p className="text-xs text-zinc-600 mt-0.5">{totalReceitas - totalDespesas >= 0 ? 'superávit' : 'déficit'}</p>
             </div>
           </div>
@@ -257,7 +317,7 @@ export default function RelatoriosPage() {
                           </div>
                           <div className="flex items-center gap-2 ml-2">
                             <span className="text-xs text-zinc-500">{pct.toFixed(1)}%</span>
-                            <span className="text-xs font-medium text-zinc-300">{formatCurrency(cat.value)}</span>
+                            <span className="text-xs font-medium text-zinc-300">{formatCurrencyCompact(cat.value)}</span>
                           </div>
                         </div>
                         <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
@@ -282,13 +342,12 @@ export default function RelatoriosPage() {
             <div className="flex items-center justify-between mb-1">
               <h3 className="font-semibold text-zinc-100">Receitas por categoria</h3>
               <button
-                onClick={() => exportCSV(categoryRecData.map(c => ({ Categoria: c.name, Valor: c.value.toFixed(2) })), 'receitas-categorias.csv')}
-                className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
-              >
+                onClick={() => exportCSV(categoryRecData.map(c => ({ Categoria: c.name, 'Valor': `R$ ${c.value.toFixed(2).replace('.', ',')}` })), 'receitas-categorias.csv')}
+                className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition-colors">
                 <Download className="w-3.5 h-3.5" />Exportar
               </button>
             </div>
-            <p className="text-xs text-zinc-500 mb-6">Últimos {period} meses — total: {formatCurrency(totalReceitas)}</p>
+            <p className="text-xs text-zinc-500 mb-6">Últimos {period} meses — total: {formatCurrencyCompact(totalReceitas)}</p>
             {categoryRecData.length > 0 ? (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <ResponsiveContainer width="100%" height={220}>
@@ -311,7 +370,7 @@ export default function RelatoriosPage() {
                           </div>
                           <div className="flex items-center gap-2 ml-2">
                             <span className="text-xs text-zinc-500">{pct.toFixed(1)}%</span>
-                            <span className="text-xs font-medium text-green-400">{formatCurrency(cat.value)}</span>
+                            <span className="text-xs font-medium text-green-400">{formatCurrencyCompact(cat.value)}</span>
                           </div>
                         </div>
                         <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
@@ -333,21 +392,16 @@ export default function RelatoriosPage() {
       {tab === 'pasta' && (
         <>
           <div className="flex items-center gap-3 mb-6">
-            <FolderOpen className="w-4 h-4 text-zinc-400" />
-            <select
-              value={selectedPasta}
-              onChange={e => setSelectedPasta(e.target.value)}
-              className="flex-1 max-w-xs bg-[#18181b] border border-zinc-800 rounded-xl px-4 py-2.5 text-zinc-200 text-sm focus:outline-none focus:border-indigo-500"
-            >
+            <FolderOpen className="w-4 h-4 text-zinc-400 flex-shrink-0" />
+            <select value={selectedPasta} onChange={e => setSelectedPasta(e.target.value)}
+              className="flex-1 max-w-xs bg-[#18181b] border border-zinc-800 rounded-xl px-4 py-2.5 text-zinc-200 text-sm focus:outline-none focus:border-indigo-500">
               <option value="">Selecione uma pasta...</option>
               {pastas.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
             </select>
             {pastaData && (
-              <button
-                onClick={() => exportCSV(pastaData.months.map((d: any) => ({ Mês: d.mes, Receitas: d.receitas.toFixed(2), Despesas: d.despesas.toFixed(2), Saldo: d.saldo.toFixed(2) })), `pasta-${pastaData.pastaNome}.csv`)}
-                className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-2 rounded-xl text-sm transition-colors border border-zinc-700"
-              >
-                <Download className="w-3.5 h-3.5" />CSV
+              <button onClick={exportPastaReport}
+                className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-2 rounded-xl text-sm transition-colors border border-zinc-700">
+                <Download className="w-3.5 h-3.5" />Exportar
               </button>
             )}
           </div>
@@ -368,16 +422,16 @@ export default function RelatoriosPage() {
               <div className="grid grid-cols-3 gap-3 mb-6">
                 <div className="bg-[#18181b] border border-zinc-800 rounded-2xl p-4">
                   <p className="text-xs text-zinc-500 mb-1">Receitas</p>
-                  <p className="text-base md:text-xl font-bold text-green-400 truncate">{formatCurrency(pastaData.sumRec)}</p>
+                  <p className="text-base md:text-xl font-bold text-green-400">{formatCurrencyCompact(pastaData.sumRec)}</p>
                 </div>
                 <div className="bg-[#18181b] border border-zinc-800 rounded-2xl p-4">
                   <p className="text-xs text-zinc-500 mb-1">Despesas</p>
-                  <p className="text-base md:text-xl font-bold text-rose-400 truncate">{formatCurrency(pastaData.sumDesp)}</p>
+                  <p className="text-base md:text-xl font-bold text-rose-400">{formatCurrencyCompact(pastaData.sumDesp)}</p>
                 </div>
                 <div className="bg-[#18181b] border border-zinc-800 rounded-2xl p-4">
                   <p className="text-xs text-zinc-500 mb-1">Saldo</p>
-                  <p className={`text-base md:text-xl font-bold truncate ${pastaData.sumRec - pastaData.sumDesp >= 0 ? 'text-blue-400' : 'text-rose-400'}`}>
-                    {formatCurrency(pastaData.sumRec - pastaData.sumDesp)}
+                  <p className={`text-base md:text-xl font-bold ${pastaData.sumRec - pastaData.sumDesp >= 0 ? 'text-blue-400' : 'text-rose-400'}`}>
+                    {formatCurrencyCompact(pastaData.sumRec - pastaData.sumDesp)}
                   </p>
                 </div>
               </div>
@@ -396,30 +450,84 @@ export default function RelatoriosPage() {
                 </ResponsiveContainer>
               </div>
 
-              <div className="bg-[#18181b] border border-zinc-800 rounded-2xl overflow-hidden">
-                <div className="p-5 border-b border-zinc-800">
-                  <h3 className="font-semibold text-zinc-100">Transações da pasta</h3>
+              {/* Despesas */}
+              <div className="bg-[#18181b] border border-zinc-800 rounded-2xl overflow-hidden mb-4">
+                <div className="flex items-center justify-between p-5 border-b border-zinc-800">
+                  <div className="flex items-center gap-2">
+                    <ArrowDownRight className="w-4 h-4 text-rose-400" />
+                    <h3 className="font-semibold text-zinc-100">Despesas</h3>
+                    <span className="text-xs text-zinc-500">({pastaData.despesas.length} transações)</span>
+                  </div>
+                  <span className="text-sm font-bold text-rose-400">{formatCurrencyCompact(pastaData.sumDesp)}</span>
                 </div>
-                {pastaData.allTxs.length === 0 ? (
-                  <p className="text-sm text-zinc-600 text-center py-12">Nenhuma transação encontrada</p>
+                {pastaData.despesas.length === 0 ? (
+                  <p className="text-sm text-zinc-600 text-center py-8">Nenhuma despesa</p>
                 ) : (
                   <div className="divide-y divide-zinc-800/50">
-                    {pastaData.allTxs.map((tx: any) => (
+                    {pastaData.despesas.map((tx: any) => (
                       <div key={tx.id} className="flex items-center gap-3 px-5 py-3">
-                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${tx.tipo === 'receita' ? 'bg-green-500/10' : 'bg-rose-500/10'}`}>
-                          {tx.tipo === 'receita'
-                            ? <TrendingUp className="w-3.5 h-3.5 text-green-400" />
-                            : <TrendingDown className="w-3.5 h-3.5 text-rose-400" />}
-                        </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-zinc-200 truncate">{tx.descricao}</p>
-                          <p className="text-xs text-zinc-500">{tx.data}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <p className="text-xs text-zinc-500">{formatDateShort(tx.data)}</p>
+                            {tx.categorias && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-md"
+                                style={{ color: tx.categorias.cor, background: `${tx.categorias.cor}20` }}>
+                                {tx.categorias.nome}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <span className={`text-sm font-semibold flex-shrink-0 ${tx.tipo === 'receita' ? 'text-green-400' : 'text-rose-400'}`}>
-                          {tx.tipo === 'receita' ? '+' : '-'}{formatCurrency(Number(tx.valor))}
+                        <span className="text-sm font-semibold text-rose-400 flex-shrink-0">
+                          -{formatCurrencyCompact(Number(tx.valor))}
                         </span>
                       </div>
                     ))}
+                    <div className="px-5 py-3 bg-rose-500/5 flex justify-between">
+                      <span className="text-sm font-semibold text-zinc-300">Total despesas</span>
+                      <span className="text-sm font-bold text-rose-400">{formatCurrency(pastaData.sumDesp)}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Receitas */}
+              <div className="bg-[#18181b] border border-zinc-800 rounded-2xl overflow-hidden">
+                <div className="flex items-center justify-between p-5 border-b border-zinc-800">
+                  <div className="flex items-center gap-2">
+                    <ArrowUpRight className="w-4 h-4 text-green-400" />
+                    <h3 className="font-semibold text-zinc-100">Receitas</h3>
+                    <span className="text-xs text-zinc-500">({pastaData.receitas.length} transações)</span>
+                  </div>
+                  <span className="text-sm font-bold text-green-400">{formatCurrencyCompact(pastaData.sumRec)}</span>
+                </div>
+                {pastaData.receitas.length === 0 ? (
+                  <p className="text-sm text-zinc-600 text-center py-8">Nenhuma receita</p>
+                ) : (
+                  <div className="divide-y divide-zinc-800/50">
+                    {pastaData.receitas.map((tx: any) => (
+                      <div key={tx.id} className="flex items-center gap-3 px-5 py-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-zinc-200 truncate">{tx.descricao}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <p className="text-xs text-zinc-500">{formatDateShort(tx.data)}</p>
+                            {tx.categorias && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-md"
+                                style={{ color: tx.categorias.cor, background: `${tx.categorias.cor}20` }}>
+                                {tx.categorias.nome}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <span className="text-sm font-semibold text-green-400 flex-shrink-0">
+                          +{formatCurrencyCompact(Number(tx.valor))}
+                        </span>
+                      </div>
+                    ))}
+                    <div className="px-5 py-3 bg-green-500/5 flex justify-between">
+                      <span className="text-sm font-semibold text-zinc-300">Total receitas</span>
+                      <span className="text-sm font-bold text-green-400">{formatCurrency(pastaData.sumRec)}</span>
+                    </div>
                   </div>
                 )}
               </div>

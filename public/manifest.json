@@ -1,0 +1,37 @@
+{
+  "name": "Finanças App",
+  "short_name": "Finanças",
+  "description": "Controle financeiro pessoal — transações, pastas, investimentos e objetivos",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#6366f1",
+  "orientation": "portrait-primary",
+  "categories": ["finance", "productivity"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Nova Transação",
+      "url": "/transacoes",
+      "description": "Adicionar uma transação"
+    },
+    {
+      "name": "Dashboard",
+      "url": "/dashboard",
+      "description": "Ver resumo financeiro"
+    }
+  ]
+}

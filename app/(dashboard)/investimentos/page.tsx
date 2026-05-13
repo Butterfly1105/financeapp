@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { formatCurrency, calculateCompoundInterest } from '@/lib/utils'
+import { formatCurrency, formatCurrencyCompact, calculateCompoundInterest } from '@/lib/utils'
 import {
   Plus, TrendingUp, Calculator, X, Trash2, Edit2,
   BarChart2, DollarSign, Calendar, Percent, PlusCircle, RefreshCw
@@ -51,6 +51,7 @@ export default function InvestimentosPage() {
   const [calcAporte, setCalcAporte] = useState('')
   const [calcTaxa, setCalcTaxa] = useState('')
   const [calcPeriodo, setCalcPeriodo] = useState('')
+  const [calcPeriodoTipo, setCalcPeriodoTipo] = useState<'meses' | 'anos'>('meses')
   const [calcTaxaTipo, setCalcTaxaTipo] = useState<'mensal' | 'anual'>('anual')
   const [calcResult, setCalcResult] = useState<any>(null)
 
@@ -139,10 +140,11 @@ export default function InvestimentosPage() {
     const p = parseFloat(calcPrincipal) || 0
     const aporte = parseFloat(calcAporte) || 0
     const taxa = parseFloat(calcTaxa) || 0
-    const meses = parseInt(calcPeriodo) || 0
-    if (!p || !taxa || !meses) { toast.error('Preencha todos os campos'); return }
+    const periodoNum = parseInt(calcPeriodo) || 0
+    if (!p || !taxa || !periodoNum) { toast.error('Preencha todos os campos obrigatórios'); return }
+    const meses = calcPeriodoTipo === 'anos' ? periodoNum * 12 : periodoNum
     const taxaMensal = calcTaxaTipo === 'anual' ? (Math.pow(1 + taxa / 100, 1 / 12) - 1) * 100 : taxa
-    setCalcResult(calculateCompoundInterest(p, taxaMensal, meses, aporte))
+    setCalcResult({ ...calculateCompoundInterest(p, taxaMensal, meses, aporte), meses, taxaMensal })
   }
 
   const totalCarteira = investments.reduce((s, i) => s + Number(i.valor_atual || i.valor_inicial), 0)
@@ -189,22 +191,22 @@ export default function InvestimentosPage() {
             <DollarSign className="w-4 h-4 text-blue-400" />
             <span className="text-xs text-zinc-500">Portfólio Total</span>
           </div>
-          <p className="text-base md:text-xl font-bold text-blue-400 truncate">{formatCurrency(totalCarteira)}</p>
+          <p className="text-base md:text-xl font-bold text-blue-400">{formatCurrencyCompact(totalCarteira)}</p>
         </div>
         <div className="bg-[#18181b] border border-zinc-800 rounded-2xl p-4">
           <div className="flex items-center gap-2 mb-2">
             <BarChart2 className="w-4 h-4 text-zinc-400" />
             <span className="text-xs text-zinc-500">Total Investido</span>
           </div>
-          <p className="text-base md:text-xl font-bold text-zinc-200 truncate">{formatCurrency(totalInvestido)}</p>
+          <p className="text-base md:text-xl font-bold text-zinc-200">{formatCurrencyCompact(totalInvestido)}</p>
         </div>
         <div className="bg-[#18181b] border border-zinc-800 rounded-2xl p-4">
           <div className="flex items-center gap-2 mb-2">
             <TrendingUp className={`w-4 h-4 ${rendimento >= 0 ? 'text-green-400' : 'text-rose-400'}`} />
             <span className="text-xs text-zinc-500">Rendimento</span>
           </div>
-          <p className={`text-base md:text-xl font-bold truncate ${rendimento >= 0 ? 'text-green-400' : 'text-rose-400'}`}>
-            {rendimento >= 0 ? '+' : ''}{formatCurrency(rendimento)}
+          <p className={`text-base md:text-xl font-bold ${rendimento >= 0 ? 'text-green-400' : 'text-rose-400'}`}>
+            {rendimento >= 0 ? '+' : ''}{formatCurrencyCompact(rendimento)}
           </p>
         </div>
       </div>
@@ -335,21 +337,28 @@ export default function InvestimentosPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-zinc-300 mb-2">Taxa de juros (%)</label>
+                    <label className="block text-sm font-medium text-zinc-300 mb-2">Taxa de juros</label>
                     <div className="flex gap-2">
                       <input type="number" step="0.01" value={calcTaxa} onChange={e => setCalcTaxa(e.target.value)} placeholder="12"
-                        className="flex-1 bg-[#1c1c1f] border border-zinc-700 rounded-xl px-4 py-3 text-zinc-100 placeholder-zinc-500 text-sm focus:outline-none focus:border-indigo-500" />
+                        className="flex-1 min-w-0 bg-[#1c1c1f] border border-zinc-700 rounded-xl px-3 py-3 text-zinc-100 placeholder-zinc-500 text-sm focus:outline-none focus:border-indigo-500" />
                       <select value={calcTaxaTipo} onChange={e => setCalcTaxaTipo(e.target.value as any)}
-                        className="bg-[#1c1c1f] border border-zinc-700 rounded-xl px-3 py-3 text-zinc-100 text-sm focus:outline-none focus:border-indigo-500">
-                        <option value="anual">a.a.</option>
-                        <option value="mensal">a.m.</option>
+                        className="bg-[#1c1c1f] border border-zinc-700 rounded-xl px-2 py-3 text-zinc-100 text-sm focus:outline-none focus:border-indigo-500">
+                        <option value="anual">% a.a.</option>
+                        <option value="mensal">% a.m.</option>
                       </select>
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-zinc-300 mb-2">Período (meses)</label>
-                    <input type="number" value={calcPeriodo} onChange={e => setCalcPeriodo(e.target.value)} placeholder="60"
-                      className="w-full bg-[#1c1c1f] border border-zinc-700 rounded-xl px-4 py-3 text-zinc-100 placeholder-zinc-500 text-sm focus:outline-none focus:border-indigo-500" />
+                    <label className="block text-sm font-medium text-zinc-300 mb-2">Período</label>
+                    <div className="flex gap-2">
+                      <input type="number" value={calcPeriodo} onChange={e => setCalcPeriodo(e.target.value)} placeholder="60"
+                        className="flex-1 min-w-0 bg-[#1c1c1f] border border-zinc-700 rounded-xl px-3 py-3 text-zinc-100 placeholder-zinc-500 text-sm focus:outline-none focus:border-indigo-500" />
+                      <select value={calcPeriodoTipo} onChange={e => setCalcPeriodoTipo(e.target.value as any)}
+                        className="bg-[#1c1c1f] border border-zinc-700 rounded-xl px-2 py-3 text-zinc-100 text-sm focus:outline-none focus:border-indigo-500">
+                        <option value="meses">meses</option>
+                        <option value="anos">anos</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
                 <button onClick={calculateResult} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl py-3 text-sm font-semibold transition-all shadow-lg shadow-indigo-500/20">
@@ -357,18 +366,27 @@ export default function InvestimentosPage() {
                 </button>
                 {calcResult && (
                   <div className="mt-4 space-y-4">
+                    <div className="bg-indigo-500/5 border border-indigo-500/20 rounded-xl p-3 text-xs text-zinc-400 text-center">
+                      {calcTaxaTipo === 'anual'
+                        ? `${calcTaxa}% a.a. = ${calcResult.taxaMensal.toFixed(4)}% a.m.`
+                        : `${calcTaxa}% a.m.`
+                      } · {calcPeriodoTipo === 'anos' ? `${calcPeriodo} anos = ${calcResult.meses} meses` : `${calcResult.meses} meses`}
+                    </div>
                     <div className="grid grid-cols-3 gap-3">
-                      <div className="bg-[#1c1c1f] rounded-xl p-4 text-center border border-zinc-700">
-                        <p className="text-xs text-zinc-500 mb-1">Montante Final</p>
-                        <p className="text-base font-bold text-indigo-400 truncate">{formatCurrency(calcResult.montante)}</p>
+                      <div className="bg-[#1c1c1f] rounded-xl p-3 text-center border border-zinc-700">
+                        <p className="text-xs text-zinc-500 mb-1">Montante</p>
+                        <p className="text-sm font-bold text-indigo-400">{formatCurrencyCompact(calcResult.montante)}</p>
+                        <p className="text-[10px] text-zinc-600 mt-0.5">{formatCurrency(calcResult.montante)}</p>
                       </div>
-                      <div className="bg-[#1c1c1f] rounded-xl p-4 text-center border border-zinc-700">
-                        <p className="text-xs text-zinc-500 mb-1">Total Investido</p>
-                        <p className="text-base font-bold text-zinc-200 truncate">{formatCurrency(calcResult.totalInvestido)}</p>
+                      <div className="bg-[#1c1c1f] rounded-xl p-3 text-center border border-zinc-700">
+                        <p className="text-xs text-zinc-500 mb-1">Investido</p>
+                        <p className="text-sm font-bold text-zinc-200">{formatCurrencyCompact(calcResult.totalInvestido)}</p>
+                        <p className="text-[10px] text-zinc-600 mt-0.5">{formatCurrency(calcResult.totalInvestido)}</p>
                       </div>
-                      <div className="bg-[#1c1c1f] rounded-xl p-4 text-center border border-zinc-700">
-                        <p className="text-xs text-zinc-500 mb-1">Rendimento</p>
-                        <p className="text-base font-bold text-green-400 truncate">+{formatCurrency(calcResult.totalJuros)}</p>
+                      <div className="bg-[#1c1c1f] rounded-xl p-3 text-center border border-zinc-700">
+                        <p className="text-xs text-zinc-500 mb-1">Juros</p>
+                        <p className="text-sm font-bold text-green-400">+{formatCurrencyCompact(calcResult.totalJuros)}</p>
+                        <p className="text-[10px] text-zinc-600 mt-0.5">{formatCurrency(calcResult.totalJuros)}</p>
                       </div>
                     </div>
                     <div className="bg-[#1c1c1f] rounded-xl p-4 border border-zinc-700">

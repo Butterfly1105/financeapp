@@ -17,11 +17,13 @@ export function formatCurrency(value: number): string {
 }
 
 export function formatCurrencyCompact(value: number): string {
-  if (Math.abs(value) >= 1000000) {
-    return `R$ ${(value / 1000000).toFixed(1)}M`
+  const abs = Math.abs(value)
+  const sign = value < 0 ? '-' : ''
+  if (abs >= 1000000) {
+    return `${sign}R$ ${(abs / 1000000).toFixed(1)}M`
   }
-  if (Math.abs(value) >= 1000) {
-    return `R$ ${(value / 1000).toFixed(1)}K`
+  if (abs >= 1000) {
+    return `${sign}R$ ${(abs / 1000).toFixed(1)}K`
   }
   return formatCurrency(value)
 }
