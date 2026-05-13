@@ -207,7 +207,52 @@ export default function PastaDetailPage() {
   // Month key for filtering
   const monthKey = getMonthKey(selectedMonth)
 
-  const monthFiltered = showAllTime ? transactions : transactions.filter(t => t.data.startsWith(monthKey))
+  function getMonthTransactions(): (Transaction & { isProjected?: boolean })[] {
+    if (showAllTime) return transactions
+
+    const now = new Date()
+    const isFutureMonth = monthKey > getMonthKey(now)
+
+    if (!isFutureMonth) {
+      return transactions.filter(t => t.data.startsWith(monthKey))
+    }
+
+    const actual = transactions.filter(t => t.data.startsWith(monthKey))
+    const projected: (Transaction & { isProjected?: boolean })[] = []
+
+    const periodToMonths: Record<string, number> = {
+      mensal: 1, bimestral: 2, trimestral: 3, semestral: 6, anual: 12,
+    }
+
+    for (const tx of transactions) {
+      if (!tx.recorrente) continue
+      if (tx.data.startsWith(monthKey)) continue
+
+      const startKey = tx.data.substring(0, 7)
+      if (startKey > monthKey) continue
+
+      if (tx.data_fim_recorrencia) {
+        const endKey = tx.data_fim_recorrencia.substring(0, 7)
+        if (endKey < monthKey) continue
+      }
+
+      const periodo = tx.periodo_recorrencia || 'mensal'
+      const periodMonths = periodToMonths[periodo]
+
+      if (periodMonths !== undefined) {
+        const [sy, sm] = startKey.split('-').map(Number)
+        const [my, mm] = monthKey.split('-').map(Number)
+        const diffMonths = (my - sy) * 12 + (mm - sm)
+        if (diffMonths % periodMonths !== 0) continue
+      }
+
+      projected.push({ ...tx, isProjected: true } as any)
+    }
+
+    return [...actual, ...projected]
+  }
+
+  const monthFiltered = getMonthTransactions()
 
   const filtered = monthFiltered.filter(t => {
     if (tab === 'receitas') return t.tipo === 'receita'
@@ -282,7 +327,6 @@ export default function PastaDetailPage() {
         <button
           onClick={() => { setSelectedMonth(d => addMonths(d, 1)); setShowAllTime(false) }}
           className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
-          disabled={monthKey >= getMonthKey(new Date())}
         >
           <ChevronRight className="w-4 h-4" />
         </button>
@@ -356,6 +400,9 @@ export default function PastaDetailPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
                       <span className="text-sm font-medium text-zinc-200">{tx.descricao}</span>
+                      {(tx as any).isProjected && (
+                        <span className="text-[10px] text-zinc-500 bg-zinc-800 border border-zinc-700 px-1.5 py-0.5 rounded-md">Projeção</span>
+                      )}
                       {tx.recorrente && (
                         <span className="flex items-center gap-1 text-[10px] text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-1.5 py-0.5 rounded-md">
                           {tx.data_fim_recorrencia ? <CreditCard className="w-2.5 h-2.5" /> : <Repeat className="w-2.5 h-2.5" />}
@@ -447,7 +494,9 @@ export default function PastaDetailPage() {
                     className="w-full bg-[#1c1c1f] border border-zinc-700 rounded-xl px-4 py-3 text-zinc-100 placeholder-zinc-500 text-sm focus:outline-none focus:border-indigo-500" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-zinc-300 mb-2">Data *</label>
+                  <label className="block text-sm font-medium text-zinc-300 mb-2">
+                    {recurrenceMode === 'parcelado' ? 'Primeira parcela em *' : 'Data *'}
+                  </label>
                   <input type="date" value={data} onChange={e => setData(e.target.value)} required
                     className="w-full bg-[#1c1c1f] border border-zinc-700 rounded-xl px-4 py-3 text-zinc-100 text-sm focus:outline-none focus:border-indigo-500" />
                 </div>

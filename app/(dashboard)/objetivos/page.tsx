@@ -146,7 +146,7 @@ export default function ObjetivosPage() {
                             {goal.descricao && <p className="text-xs text-zinc-500 mt-0.5 max-w-36 truncate">{goal.descricao}</p>}
                           </div>
                         </div>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center gap-1">
                           <button onClick={() => toggleStatus(goal)} className="p-1.5 rounded-lg text-zinc-500 hover:text-yellow-400 hover:bg-yellow-500/10 transition-colors" title="Pausar">
                             <Pause className="w-3.5 h-3.5" />
                           </button>
@@ -203,7 +203,7 @@ export default function ObjetivosPage() {
                           <span className="text-xl">{goal.icone}</span>
                           <span className="font-medium text-zinc-300">{goal.nome}</span>
                         </div>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center gap-1">
                           <button onClick={() => toggleStatus(goal)} className="p-1.5 rounded-lg text-zinc-500 hover:text-green-400" title="Retomar"><Play className="w-3.5 h-3.5" /></button>
                           <button onClick={() => handleDelete(goal.id)} className="p-1.5 rounded-lg text-zinc-500 hover:text-rose-400"><Trash2 className="w-3.5 h-3.5" /></button>
                         </div>
@@ -237,7 +237,7 @@ export default function ObjetivosPage() {
                           </div>
                         </div>
                       </div>
-                      <button onClick={() => handleDelete(goal.id)} className="p-1.5 rounded-lg text-zinc-600 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => handleDelete(goal.id)} className="p-1.5 rounded-lg text-zinc-600 hover:text-rose-400 transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
                     </div>
                     <p className="text-sm font-bold text-green-400 mt-2">{formatCurrency(goal.valor_alvo)}</p>
                   </div>

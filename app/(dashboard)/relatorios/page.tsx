@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency, formatCurrencyCompact, formatDateShort } from '@/lib/utils'
-import { BarChart2, Download, TrendingUp, TrendingDown, Wallet, FolderOpen, ArrowUpRight, ArrowDownRight } from 'lucide-react'
+import { BarChart2, Download, TrendingUp, TrendingDown, Wallet, FolderOpen, ArrowUpRight, ArrowDownRight, Printer } from 'lucide-react'
 import {
   BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell,
   ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid
@@ -189,6 +189,104 @@ export default function RelatoriosPage() {
     )
   }
 
+  function printReport() {
+    const dateStr = format(new Date(), "dd/MM/yyyy 'às' HH:mm")
+    let content = ''
+
+    if (tab === 'geral') {
+      content = `
+        <h1>Relatório Geral — Últimos ${period} meses</h1>
+        <p class="sub">Gerado em ${dateStr}</p>
+        <div class="summary">
+          <div class="card"><div class="label">Total Receitas</div><div class="value green">${formatCurrency(totalReceitas)}</div></div>
+          <div class="card"><div class="label">Total Despesas</div><div class="value red">${formatCurrency(totalDespesas)}</div></div>
+          <div class="card"><div class="label">Saldo Total</div><div class="value ${totalReceitas - totalDespesas >= 0 ? 'blue' : 'red'}">${formatCurrency(totalReceitas - totalDespesas)}</div></div>
+        </div>
+        <h2>Evolução Mensal</h2>
+        <table>
+          <thead><tr><th>Mês</th><th>Receitas</th><th>Despesas</th><th>Saldo</th></tr></thead>
+          <tbody>
+            ${monthlyData.map(d => `<tr><td>${d.mes}</td><td class="green">${formatCurrency(d.receitas)}</td><td class="red">${formatCurrency(d.despesas)}</td><td class="${d.saldo >= 0 ? 'blue' : 'red'}">${formatCurrency(d.saldo)}</td></tr>`).join('')}
+          </tbody>
+        </table>
+      `
+    } else if (tab === 'pasta' && pastaData) {
+      content = `
+        <h1>Relatório — ${pastaData.pastaNome}</h1>
+        <p class="sub">Últimos ${period} meses · Gerado em ${dateStr}</p>
+        <div class="summary">
+          <div class="card"><div class="label">Receitas</div><div class="value green">${formatCurrency(pastaData.sumRec)}</div></div>
+          <div class="card"><div class="label">Despesas</div><div class="value red">${formatCurrency(pastaData.sumDesp)}</div></div>
+          <div class="card"><div class="label">Saldo</div><div class="value ${pastaData.sumRec - pastaData.sumDesp >= 0 ? 'blue' : 'red'}">${formatCurrency(pastaData.sumRec - pastaData.sumDesp)}</div></div>
+        </div>
+        <h2>Despesas (${pastaData.despesas.length})</h2>
+        <table>
+          <thead><tr><th>Descrição</th><th>Categoria</th><th>Data</th><th>Valor</th></tr></thead>
+          <tbody>
+            ${pastaData.despesas.map((tx: any) => `<tr><td>${tx.descricao}</td><td>${tx.categorias?.nome || '-'}</td><td>${formatDateShort(tx.data)}</td><td class="red">-${formatCurrency(Number(tx.valor))}</td></tr>`).join('')}
+            <tr class="total"><td colspan="3">Total Despesas</td><td class="red">-${formatCurrency(pastaData.sumDesp)}</td></tr>
+          </tbody>
+        </table>
+        <h2>Receitas (${pastaData.receitas.length})</h2>
+        <table>
+          <thead><tr><th>Descrição</th><th>Categoria</th><th>Data</th><th>Valor</th></tr></thead>
+          <tbody>
+            ${pastaData.receitas.map((tx: any) => `<tr><td>${tx.descricao}</td><td>${tx.categorias?.nome || '-'}</td><td>${formatDateShort(tx.data)}</td><td class="green">+${formatCurrency(Number(tx.valor))}</td></tr>`).join('')}
+            <tr class="total"><td colspan="3">Total Receitas</td><td class="green">+${formatCurrency(pastaData.sumRec)}</td></tr>
+          </tbody>
+        </table>
+      `
+    } else if (tab === 'receitas') {
+      content = `
+        <h1>Relatório de Receitas por Categoria</h1>
+        <p class="sub">Últimos ${period} meses · Total: ${formatCurrency(totalReceitas)} · Gerado em ${dateStr}</p>
+        <table>
+          <thead><tr><th>Categoria</th><th>Valor</th><th>%</th></tr></thead>
+          <tbody>
+            ${categoryRecData.map(cat => `<tr><td>${cat.name}</td><td class="green">${formatCurrency(cat.value)}</td><td>${totalReceitas > 0 ? ((cat.value / totalReceitas) * 100).toFixed(1) : 0}%</td></tr>`).join('')}
+          </tbody>
+        </table>
+      `
+    }
+
+    const printContainer = document.createElement('div')
+    printContainer.id = 'rel-print-container'
+    printContainer.innerHTML = `
+      <style>
+        #rel-print-container { font-family: Arial, sans-serif; max-width: 820px; margin: 30px auto; color: #1a1a1a; }
+        #rel-print-container h1 { color: #4f46e5; border-bottom: 2px solid #4f46e5; padding-bottom: 10px; margin-bottom: 4px; font-size: 22px; }
+        #rel-print-container h2 { color: #374151; margin: 24px 0 12px; font-size: 16px; }
+        #rel-print-container .sub { color: #6b7280; font-size: 12px; margin-bottom: 20px; }
+        #rel-print-container .summary { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin: 20px 0; }
+        #rel-print-container .card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px; }
+        #rel-print-container .label { font-size: 11px; color: #6b7280; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+        #rel-print-container .value { font-size: 20px; font-weight: bold; }
+        #rel-print-container table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+        #rel-print-container th { background: #4f46e5; color: white; padding: 9px 12px; text-align: left; font-size: 12px; }
+        #rel-print-container td { padding: 8px 12px; border-bottom: 1px solid #f3f4f6; font-size: 13px; }
+        #rel-print-container tr:nth-child(even) td { background: #f9fafb; }
+        #rel-print-container tr.total td { font-weight: bold; background: #f3f4f6 !important; }
+        .green { color: #16a34a; } .red { color: #dc2626; } .blue { color: #2563eb; }
+      </style>
+      ${content}
+    `
+
+    const printStyle = document.createElement('style')
+    printStyle.id = 'rel-print-style'
+    printStyle.innerHTML = `@media print { body > *:not(#rel-print-container) { display: none !important; } #rel-print-container { display: block !important; } }`
+
+    document.body.appendChild(printStyle)
+    document.body.appendChild(printContainer)
+
+    window.addEventListener('afterprint', function cleanup() {
+      document.getElementById('rel-print-container')?.remove()
+      document.getElementById('rel-print-style')?.remove()
+      window.removeEventListener('afterprint', cleanup)
+    })
+
+    window.print()
+  }
+
   const customTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null
     return (
@@ -224,9 +322,13 @@ export default function RelatoriosPage() {
           {tab === 'geral' && (
             <button onClick={exportGeralReport}
               className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-2 rounded-xl text-sm font-medium transition-colors border border-zinc-700">
-              <Download className="w-4 h-4" /><span className="hidden sm:inline">Exportar</span>
+              <Download className="w-4 h-4" /><span className="hidden sm:inline">CSV</span>
             </button>
           )}
+          <button onClick={printReport}
+            className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-2 rounded-xl text-sm font-medium transition-colors border border-zinc-700">
+            <Printer className="w-4 h-4" /><span className="hidden sm:inline">PDF</span>
+          </button>
         </div>
       </div>
 
@@ -399,10 +501,16 @@ export default function RelatoriosPage() {
               {pastas.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
             </select>
             {pastaData && (
-              <button onClick={exportPastaReport}
-                className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-2 rounded-xl text-sm transition-colors border border-zinc-700">
-                <Download className="w-3.5 h-3.5" />Exportar
-              </button>
+              <div className="flex items-center gap-2">
+                <button onClick={exportPastaReport}
+                  className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-2 rounded-xl text-sm transition-colors border border-zinc-700">
+                  <Download className="w-3.5 h-3.5" />CSV
+                </button>
+                <button onClick={printReport}
+                  className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-2 rounded-xl text-sm transition-colors border border-zinc-700">
+                  <Printer className="w-3.5 h-3.5" />PDF
+                </button>
+              </div>
             )}
           </div>
 

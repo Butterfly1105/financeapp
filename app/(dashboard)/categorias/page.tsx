@@ -104,7 +104,7 @@ export default function CategoriasPage() {
                         <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: cat.cor }} />
                         <span className="text-sm text-zinc-200 truncate">{cat.nome}</span>
                       </div>
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center gap-1">
                         <button onClick={() => openEdit(cat)} className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800">
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>

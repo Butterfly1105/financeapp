@@ -62,6 +62,7 @@ export default function OrcamentosPage() {
 
   // Item form
   const [showItemForm, setShowItemForm] = useState(false)
+  const [editingItem, setEditingItem] = useState<PropostaItem | null>(null)
   const [itemPropostaId, setItemPropostaId] = useState('')
   const [itemDescricao, setItemDescricao] = useState('')
   const [itemCategoria, setItemCategoria] = useState('')
@@ -133,7 +134,18 @@ export default function OrcamentosPage() {
   }
 
   function openItemForm(propostaId: string) {
+    setEditingItem(null)
     setItemPropostaId(propostaId); setItemDescricao(''); setItemCategoria(''); setItemQtd('1'); setItemValor('')
+    setShowItemForm(true)
+  }
+
+  function openEditItem(item: PropostaItem) {
+    setEditingItem(item)
+    setItemPropostaId(item.proposta_id)
+    setItemDescricao(item.descricao)
+    setItemCategoria(item.categoria || '')
+    setItemQtd(String(item.quantidade))
+    setItemValor(String(item.valor_unitario))
     setShowItemForm(true)
   }
 
@@ -143,9 +155,19 @@ export default function OrcamentosPage() {
     const qtd = parseFloat(itemQtd) || 1
     if (!valor || valor < 0) { toast.error('Valor inválido'); return }
     setSavingItem(true)
-    const { error } = await supabase.from('proposta_itens').insert({ proposta_id: itemPropostaId, descricao: itemDescricao, categoria: itemCategoria || null, quantidade: qtd, valor_unitario: valor })
-    if (error) toast.error('Erro ao adicionar item')
-    else { toast.success('Item adicionado!'); setShowItemForm(false); loadItens(itemPropostaId) }
+    if (editingItem) {
+      const { error } = await supabase.from('proposta_itens').update({
+        descricao: itemDescricao, categoria: itemCategoria || null, quantidade: qtd, valor_unitario: valor,
+      }).eq('id', editingItem.id)
+      if (error) toast.error('Erro ao atualizar item')
+      else { toast.success('Item atualizado!'); setShowItemForm(false); loadItens(itemPropostaId) }
+    } else {
+      const { error } = await supabase.from('proposta_itens').insert({
+        proposta_id: itemPropostaId, descricao: itemDescricao, categoria: itemCategoria || null, quantidade: qtd, valor_unitario: valor,
+      })
+      if (error) toast.error('Erro ao adicionar item')
+      else { toast.success('Item adicionado!'); setShowItemForm(false); loadItens(itemPropostaId) }
+    }
     setSavingItem(false)
   }
 
@@ -157,24 +179,23 @@ export default function OrcamentosPage() {
   function printProposta(proposta: Proposta) {
     const itens = itensByProposta[proposta.id] || []
     const total = itens.reduce((s, i) => s + i.quantidade * i.valor_unitario, 0)
-    const printWindow = window.open('', '_blank')
-    if (!printWindow) return
-    printWindow.document.write(`
-      <!DOCTYPE html><html><head><title>Orçamento - ${proposta.titulo}</title>
+
+    const printContainer = document.createElement('div')
+    printContainer.id = 'orca-print-container'
+    printContainer.innerHTML = `
       <style>
-        body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; color: #1a1a1a; }
-        h1 { color: #4f46e5; border-bottom: 2px solid #4f46e5; padding-bottom: 10px; }
-        .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; background: #f8f8f8; padding: 16px; border-radius: 8px; }
-        .meta p { margin: 4px 0; font-size: 14px; }
-        .meta strong { color: #444; }
-        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-        th { background: #4f46e5; color: white; padding: 10px 12px; text-align: left; }
-        td { padding: 10px 12px; border-bottom: 1px solid #eee; }
-        tr:nth-child(even) td { background: #fafafa; }
-        .total { font-size: 20px; font-weight: bold; color: #4f46e5; text-align: right; margin-top: 16px; }
-        .footer { margin-top: 40px; font-size: 12px; color: #888; border-top: 1px solid #eee; padding-top: 10px; }
-        @media print { body { margin: 20px; } }
-      </style></head><body>
+        #orca-print-container { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; color: #1a1a1a; }
+        #orca-print-container h1 { color: #4f46e5; border-bottom: 2px solid #4f46e5; padding-bottom: 10px; }
+        #orca-print-container .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; background: #f8f8f8; padding: 16px; border-radius: 8px; }
+        #orca-print-container .meta p { margin: 4px 0; font-size: 14px; }
+        #orca-print-container .meta strong { color: #444; }
+        #orca-print-container table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        #orca-print-container th { background: #4f46e5; color: white; padding: 10px 12px; text-align: left; }
+        #orca-print-container td { padding: 10px 12px; border-bottom: 1px solid #eee; }
+        #orca-print-container tr:nth-child(even) td { background: #fafafa; }
+        #orca-print-container .total { font-size: 20px; font-weight: bold; color: #4f46e5; text-align: right; margin-top: 16px; }
+        #orca-print-container .footer { margin-top: 40px; font-size: 12px; color: #888; border-top: 1px solid #eee; padding-top: 10px; }
+      </style>
       <h1>${proposta.titulo}</h1>
       <div class="meta">
         <div><p><strong>Cliente:</strong> ${proposta.cliente_nome}</p>${proposta.cliente_email ? `<p><strong>Email:</strong> ${proposta.cliente_email}</p>` : ''}</div>
@@ -187,11 +208,22 @@ export default function OrcamentosPage() {
       </table>
       <div class="total">Total: ${formatCurrency(total)}</div>
       <div class="footer">Orçamento gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm")}</div>
-      </body></html>
-    `)
-    printWindow.document.close()
-    printWindow.focus()
-    setTimeout(() => { printWindow.print() }, 500)
+    `
+
+    const printStyle = document.createElement('style')
+    printStyle.id = 'orca-print-style'
+    printStyle.innerHTML = `@media print { body > *:not(#orca-print-container) { display: none !important; } #orca-print-container { display: block !important; } }`
+
+    document.body.appendChild(printStyle)
+    document.body.appendChild(printContainer)
+
+    window.addEventListener('afterprint', function cleanup() {
+      document.getElementById('orca-print-container')?.remove()
+      document.getElementById('orca-print-style')?.remove()
+      window.removeEventListener('afterprint', cleanup)
+    })
+
+    window.print()
   }
 
   if (loading) return <div className="p-6 space-y-4">{[...Array(3)].map((_, i) => <div key={i} className="h-28 skeleton rounded-2xl" />)}</div>
@@ -333,9 +365,14 @@ export default function OrcamentosPage() {
                                     <td className="py-2.5 text-right text-zinc-300">{formatCurrency(item.valor_unitario)}</td>
                                     <td className="py-2.5 text-right font-semibold text-zinc-100">{formatCurrency(item.quantidade * item.valor_unitario)}</td>
                                     <td className="py-2.5">
-                                      <button onClick={() => handleDeleteItem(item.id, proposta.id)} className="p-1 rounded text-zinc-700 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-all">
-                                        <Trash2 className="w-3 h-3" />
-                                      </button>
+                                      <div className="flex items-center gap-0.5 justify-end">
+                                        <button onClick={() => openEditItem(item)} className="p-1 rounded text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800 transition-all">
+                                          <Edit2 className="w-3 h-3" />
+                                        </button>
+                                        <button onClick={() => handleDeleteItem(item.id, proposta.id)} className="p-1 rounded text-zinc-600 hover:text-rose-400 hover:bg-rose-500/10 transition-all">
+                                          <Trash2 className="w-3 h-3" />
+                                        </button>
+                                      </div>
                                     </td>
                                   </tr>
                                 ))}
@@ -432,7 +469,7 @@ export default function OrcamentosPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop">
           <div className="bg-[#18181b] border border-zinc-700 rounded-2xl w-full max-w-md shadow-2xl">
             <div className="flex items-center justify-between p-6 border-b border-zinc-800">
-              <h2 className="text-lg font-semibold text-zinc-100">Adicionar Item</h2>
+              <h2 className="text-lg font-semibold text-zinc-100">{editingItem ? 'Editar' : 'Adicionar'} Item</h2>
               <button onClick={() => setShowItemForm(false)} className="p-2 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800"><X className="w-4 h-4" /></button>
             </div>
             <form onSubmit={handleSaveItem} className="p-6 space-y-4">
@@ -466,7 +503,7 @@ export default function OrcamentosPage() {
               <div className="flex gap-3 pt-1">
                 <button type="button" onClick={() => setShowItemForm(false)} className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl py-3 text-sm font-medium">Cancelar</button>
                 <button type="submit" disabled={savingItem} className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl py-3 text-sm font-semibold disabled:opacity-50">
-                  {savingItem ? 'Salvando...' : 'Adicionar'}
+                  {savingItem ? 'Salvando...' : editingItem ? 'Salvar' : 'Adicionar'}
                 </button>
               </div>
             </form>

@@ -23,6 +23,8 @@ export default function TransacoesPage() {
   const [search, setSearch] = useState('')
   const [filterTipo, setFilterTipo] = useState<'todas' | 'receita' | 'despesa'>('todas')
   const [filterMes, setFilterMes] = useState('')
+  const [filterCategoria, setFilterCategoria] = useState('')
+  const [filterTag, setFilterTag] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
   const [saving, setSaving] = useState(false)
@@ -174,6 +176,11 @@ export default function TransacoesPage() {
     if (filterTipo !== 'todas' && t.tipo !== filterTipo) return false
     if (search && !t.descricao.toLowerCase().includes(search.toLowerCase())) return false
     if (filterMes && !t.data.startsWith(filterMes)) return false
+    if (filterCategoria && t.categoria_id !== filterCategoria) return false
+    if (filterTag) {
+      const txTagIds = (t as any).transacao_tags?.map((tt: any) => tt.tags?.id).filter(Boolean) || []
+      if (!txTagIds.includes(filterTag)) return false
+    }
     return true
   })
 
@@ -236,8 +243,20 @@ export default function TransacoesPage() {
         </select>
         <input type="month" value={filterMes} onChange={e => setFilterMes(e.target.value)}
           className="bg-[#18181b] border border-zinc-800 rounded-xl px-3 py-2.5 text-zinc-300 text-sm focus:outline-none focus:border-indigo-500" />
-        {(search || filterTipo !== 'todas' || filterMes) && (
-          <button onClick={() => { setSearch(''); setFilterTipo('todas'); setFilterMes('') }}
+        <select value={filterCategoria} onChange={e => setFilterCategoria(e.target.value)}
+          className="bg-[#18181b] border border-zinc-800 rounded-xl px-3 py-2.5 text-zinc-300 text-sm focus:outline-none focus:border-indigo-500">
+          <option value="">Categoria</option>
+          {categories.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+        </select>
+        {tagsAvailable.length > 0 && (
+          <select value={filterTag} onChange={e => setFilterTag(e.target.value)}
+            className="bg-[#18181b] border border-zinc-800 rounded-xl px-3 py-2.5 text-zinc-300 text-sm focus:outline-none focus:border-indigo-500">
+            <option value="">Tag</option>
+            {tagsAvailable.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
+          </select>
+        )}
+        {(search || filterTipo !== 'todas' || filterMes || filterCategoria || filterTag) && (
+          <button onClick={() => { setSearch(''); setFilterTipo('todas'); setFilterMes(''); setFilterCategoria(''); setFilterTag('') }}
             className="flex items-center gap-1.5 bg-zinc-800 text-zinc-400 hover:text-zinc-200 px-3 py-2.5 rounded-xl text-sm transition-colors">
             <X className="w-3.5 h-3.5" />Limpar
           </button>
@@ -350,7 +369,9 @@ export default function TransacoesPage() {
                     className="w-full bg-[#1c1c1f] border border-zinc-700 rounded-xl px-4 py-3 text-zinc-100 text-sm focus:outline-none focus:border-indigo-500" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-zinc-300 mb-2">Data *</label>
+                  <label className="block text-sm font-medium text-zinc-300 mb-2">
+                    {recurrenceMode === 'parcelado' ? 'Primeira parcela em *' : 'Data *'}
+                  </label>
                   <input type="date" value={data} onChange={e => setData(e.target.value)} required
                     className="w-full bg-[#1c1c1f] border border-zinc-700 rounded-xl px-4 py-3 text-zinc-100 text-sm focus:outline-none focus:border-indigo-500" />
                 </div>

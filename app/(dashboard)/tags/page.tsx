@@ -103,7 +103,7 @@ export default function TagsPage() {
             >
               <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: tag.cor }} />
               <span className="text-sm font-medium text-zinc-200">{tag.nome}</span>
-              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity ml-1">
+              <div className="flex items-center gap-0.5 ml-1">
                 <button onClick={() => openEdit(tag)} className="p-1 rounded-lg text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800 transition-colors">
                   <Edit2 className="w-3 h-3" />
                 </button>
