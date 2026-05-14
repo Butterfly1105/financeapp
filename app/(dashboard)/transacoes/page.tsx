@@ -98,8 +98,8 @@ export default function TransacoesPage() {
 
   // Initialize per-installment values when count or base value changes
   useEffect(() => {
-    if (recurrenceMode !== 'parcelado') { setParcelasCustom([]); return }
     if (editingTx) return
+    if (recurrenceMode !== 'parcelado') { setParcelasCustom([]); return }
     const n = parseInt(numeroParcelas)
     if (!n || n < 2 || !valor) { setParcelasCustom([]); return }
     setParcelasCustom(Array.from({ length: n }, () => valor))
