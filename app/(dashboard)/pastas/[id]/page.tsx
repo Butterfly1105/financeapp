@@ -65,6 +65,7 @@ export default function PastaDetailPage() {
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [parcelasCustom, setParcelasCustom] = useState<string[]>([])
+  const [parcelasStatus, setParcelasStatus] = useState<string[]>([])
   const [bulkParcelGroup, setBulkParcelGroup] = useState<Transaction[]>([])
   const [parcelasEditDates, setParcelasEditDates] = useState<string[]>([])
 
@@ -135,6 +136,7 @@ export default function PastaDetailPage() {
     setNotas('')
     setSelectedTags([])
     setParcelasCustom([])
+    setParcelasStatus([])
     setBulkParcelGroup([]); setParcelasEditDates([])
     setEditingTx(null)
   }
@@ -158,6 +160,7 @@ export default function PastaDetailPage() {
       setBulkParcelGroup(group)
       setParcelasCustom(group.map(t => String(t.valor)))
       setParcelasEditDates(group.map(t => t.data))
+      setParcelasStatus(group.map(t => t.status === 'pago' ? 'pago' : t.status === 'pendente' ? 'pendente' : 'nenhum'))
       setTipo(tx.tipo)
       setDescricao(baseName)
       setValor(String(tx.valor))
@@ -171,7 +174,7 @@ export default function PastaDetailPage() {
       return
     }
 
-    setBulkParcelGroup([]); setParcelasCustom([]); setParcelasEditDates([])
+    setBulkParcelGroup([]); setParcelasCustom([]); setParcelasEditDates([]); setParcelasStatus([])
     setTipo(tx.tipo)
     setDescricao(tx.descricao)
     setValor(String(tx.valor))
@@ -209,17 +212,18 @@ export default function PastaDetailPage() {
     // Bulk edit: atualiza todas as parcelas do grupo
     if (editingTx && bulkParcelGroup.length > 0) {
       const n = bulkParcelGroup.length
-      await Promise.all(bulkParcelGroup.map((t, i) =>
-        supabase.from('transacoes').update({
+      await Promise.all(bulkParcelGroup.map((t, i) => {
+        const s = parcelasStatus[i] ?? 'nenhum'
+        return supabase.from('transacoes').update({
           descricao: `${descricao} (${i + 1}/${n})`,
           valor: parseFloat(parcelasCustom[i]) > 0 ? parseFloat(parcelasCustom[i]) : numValor,
           data: parcelasEditDates[i] || t.data,
           tipo,
           categoria_id: categoriaId || null,
-          status: status === 'nenhum' ? null : status,
+          status: s === 'nenhum' ? null : s,
           notas: notas || null,
         }).eq('id', t.id)
-      ))
+      }))
       for (const t of bulkParcelGroup) {
         await supabase.from('transacao_tags').delete().eq('transacao_id', t.id)
         if (selectedTags.length > 0) {
@@ -230,7 +234,7 @@ export default function PastaDetailPage() {
       }
       toast.success(`${n} parcelas atualizadas!`)
       setShowForm(false)
-      setBulkParcelGroup([]); setParcelasEditDates([])
+      setBulkParcelGroup([]); setParcelasEditDates([]); setParcelasStatus([])
       loadData(); setSaving(false)
       return
     }
@@ -813,25 +817,37 @@ export default function PastaDetailPage() {
               {editingTx && bulkParcelGroup.length > 0 && (
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-medium text-zinc-400">{bulkParcelGroup.length} parcelas <span className="text-zinc-600">(edite data e valor individualmente)</span></span>
+                    <span className="text-xs font-medium text-zinc-400">{bulkParcelGroup.length} parcelas <span className="text-zinc-600">(edite data, valor e status individualmente)</span></span>
                     <span className="text-xs text-zinc-500">Total: {formatCurrencyCompact(parcelasCustom.reduce((s, v) => s + (parseFloat(v) || 0), 0))}</span>
                   </div>
                   <div className="max-h-52 overflow-y-auto rounded-xl border border-zinc-700 divide-y divide-zinc-800/70 bg-[#1c1c1f]">
-                    {bulkParcelGroup.map((t, i) => (
-                      <div key={t.id} className="flex items-center gap-2 px-3 py-2">
-                        <span className="text-[10px] text-indigo-400 font-semibold w-10 flex-shrink-0">{i + 1}/{bulkParcelGroup.length}</span>
-                        <input
-                          type="date" value={parcelasEditDates[i] || t.data}
-                          onChange={e => { const a = [...parcelasEditDates]; a[i] = e.target.value; setParcelasEditDates(a) }}
-                          className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-zinc-100 text-xs focus:outline-none focus:border-indigo-500"
-                        />
-                        <input
-                          type="number" step="0.01" min="0.01" value={parcelasCustom[i] || String(t.valor)}
-                          onChange={e => { const a = [...parcelasCustom]; a[i] = e.target.value; setParcelasCustom(a) }}
-                          className="w-24 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-zinc-100 text-xs text-right focus:outline-none focus:border-indigo-500"
-                        />
-                      </div>
-                    ))}
+                    {bulkParcelGroup.map((t, i) => {
+                      const ps = parcelasStatus[i] ?? 'nenhum'
+                      return (
+                        <div key={t.id} className="flex items-center gap-2 px-3 py-2">
+                          <span className="text-[10px] text-indigo-400 font-semibold w-10 flex-shrink-0">{i + 1}/{bulkParcelGroup.length}</span>
+                          <input
+                            type="date" value={parcelasEditDates[i] || t.data}
+                            onChange={e => { const a = [...parcelasEditDates]; a[i] = e.target.value; setParcelasEditDates(a) }}
+                            className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-zinc-100 text-xs focus:outline-none focus:border-indigo-500"
+                          />
+                          <select
+                            value={ps}
+                            onChange={e => { const a = [...parcelasStatus]; a[i] = e.target.value; setParcelasStatus(a) }}
+                            className={`w-[88px] bg-zinc-800 border rounded-lg px-2 py-1.5 text-xs font-medium focus:outline-none focus:border-indigo-500 flex-shrink-0 ${ps === 'pago' ? 'border-green-600/50 text-green-400' : ps === 'pendente' ? 'border-yellow-600/50 text-yellow-400' : 'border-zinc-700 text-zinc-500'}`}
+                          >
+                            <option value="nenhum">—</option>
+                            <option value="pago">Pago</option>
+                            <option value="pendente">Pendente</option>
+                          </select>
+                          <input
+                            type="number" step="0.01" min="0.01" value={parcelasCustom[i] || String(t.valor)}
+                            onChange={e => { const a = [...parcelasCustom]; a[i] = e.target.value; setParcelasCustom(a) }}
+                            className="w-24 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-zinc-100 text-xs text-right focus:outline-none focus:border-indigo-500"
+                          />
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               )}

@@ -36,12 +36,11 @@ export default function PastasPage() {
       pastasData.map(async pasta => {
         const { data: transactions } = await supabase
           .from('transacoes')
-          .select('tipo, valor')
+          .select('tipo, valor, status')
           .eq('pasta_id', pasta.id)
-          .eq('status', 'pago')
 
-        const receitas = transactions?.filter(t => t.tipo === 'receita').reduce((s, t) => s + Number(t.valor), 0) || 0
-        const despesas = transactions?.filter(t => t.tipo === 'despesa').reduce((s, t) => s + Number(t.valor), 0) || 0
+        const receitas = transactions?.filter(t => t.tipo === 'receita' && t.status === 'pago').reduce((s, t) => s + Number(t.valor), 0) || 0
+        const despesas = transactions?.filter(t => t.tipo === 'despesa' && t.status === 'pago').reduce((s, t) => s + Number(t.valor), 0) || 0
         return {
           ...pasta,
           total_receitas: receitas,
