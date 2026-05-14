@@ -241,8 +241,11 @@ export default function TransacoesPage() {
           <option value="receita">Receitas</option>
           <option value="despesa">Despesas</option>
         </select>
-        <input type="month" value={filterMes} onChange={e => setFilterMes(e.target.value)}
-          className="bg-[#18181b] border border-zinc-800 rounded-xl px-3 py-2.5 text-zinc-300 text-sm focus:outline-none focus:border-indigo-500" />
+        <div className="flex items-center gap-2 bg-[#18181b] border border-zinc-800 rounded-xl px-3 py-2 focus-within:border-indigo-500 transition-colors">
+          <span className="text-xs text-zinc-500 flex-shrink-0">Período</span>
+          <input type="month" value={filterMes} onChange={e => setFilterMes(e.target.value)}
+            className="bg-transparent text-zinc-300 text-sm focus:outline-none" />
+        </div>
         <select value={filterCategoria} onChange={e => setFilterCategoria(e.target.value)}
           className="bg-[#18181b] border border-zinc-800 rounded-xl px-3 py-2.5 text-zinc-300 text-sm focus:outline-none focus:border-indigo-500">
           <option value="">Categoria</option>

@@ -191,60 +191,128 @@ export default function RelatoriosPage() {
 
   function printReport() {
     const dateStr = format(new Date(), "dd/MM/yyyy 'às' HH:mm")
-    let content = ''
+    let title = ''
+    let subtitle = ''
+    let bodyContent = ''
 
     if (tab === 'geral') {
-      content = `
-        <h1>Relatório Geral — Últimos ${period} meses</h1>
-        <p class="sub">Gerado em ${dateStr}</p>
-        <div class="summary">
-          <div class="card"><div class="label">Total Receitas</div><div class="value green">${formatCurrency(totalReceitas)}</div></div>
-          <div class="card"><div class="label">Total Despesas</div><div class="value red">${formatCurrency(totalDespesas)}</div></div>
-          <div class="card"><div class="label">Saldo Total</div><div class="value ${totalReceitas - totalDespesas >= 0 ? 'blue' : 'red'}">${formatCurrency(totalReceitas - totalDespesas)}</div></div>
+      title = 'Relatório Geral'
+      subtitle = `Últimos ${period} meses`
+      const saldoTotal = totalReceitas - totalDespesas
+      bodyContent = `
+        <div class="kpi-row">
+          <div class="kpi"><div class="kpi-label">Total Receitas</div><div class="kpi-value green">${formatCurrency(totalReceitas)}</div></div>
+          <div class="kpi"><div class="kpi-label">Total Despesas</div><div class="kpi-value red">${formatCurrency(totalDespesas)}</div></div>
+          <div class="kpi"><div class="kpi-label">Saldo do Período</div><div class="kpi-value ${saldoTotal >= 0 ? 'blue' : 'red'}">${formatCurrency(saldoTotal)}</div></div>
+          <div class="kpi"><div class="kpi-label">Saldo Médio/Mês</div><div class="kpi-value ${saldoMedio >= 0 ? 'blue' : 'red'}">${formatCurrency(saldoMedio)}</div></div>
         </div>
         <h2>Evolução Mensal</h2>
         <table>
-          <thead><tr><th>Mês</th><th>Receitas</th><th>Despesas</th><th>Saldo</th></tr></thead>
+          <thead><tr><th>Mês</th><th class="right">Receitas</th><th class="right">Despesas</th><th class="right">Saldo</th></tr></thead>
           <tbody>
-            ${monthlyData.map(d => `<tr><td>${d.mes}</td><td class="green">${formatCurrency(d.receitas)}</td><td class="red">${formatCurrency(d.despesas)}</td><td class="${d.saldo >= 0 ? 'blue' : 'red'}">${formatCurrency(d.saldo)}</td></tr>`).join('')}
+            ${monthlyData.map(d => `
+              <tr>
+                <td>${d.mes}</td>
+                <td class="right green">${formatCurrency(d.receitas)}</td>
+                <td class="right red">${formatCurrency(d.despesas)}</td>
+                <td class="right ${d.saldo >= 0 ? 'blue' : 'red'}">${formatCurrency(d.saldo)}</td>
+              </tr>`).join('')}
           </tbody>
+          <tfoot>
+            <tr class="tfoot-row">
+              <td><strong>Total</strong></td>
+              <td class="right green"><strong>${formatCurrency(totalReceitas)}</strong></td>
+              <td class="right red"><strong>${formatCurrency(totalDespesas)}</strong></td>
+              <td class="right ${saldoTotal >= 0 ? 'blue' : 'red'}"><strong>${formatCurrency(saldoTotal)}</strong></td>
+            </tr>
+          </tfoot>
         </table>
+        ${categoryDespData.length > 0 ? `
+        <h2>Despesas por Categoria</h2>
+        <table>
+          <thead><tr><th>Categoria</th><th class="right">Valor</th><th class="right">%</th></tr></thead>
+          <tbody>
+            ${categoryDespData.map(cat => `
+              <tr>
+                <td>${cat.name}</td>
+                <td class="right red">${formatCurrency(cat.value)}</td>
+                <td class="right muted">${totalDespesas > 0 ? ((cat.value / totalDespesas) * 100).toFixed(1) : 0}%</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>` : ''}
       `
     } else if (tab === 'pasta' && pastaData) {
-      content = `
-        <h1>Relatório — ${pastaData.pastaNome}</h1>
-        <p class="sub">Últimos ${period} meses · Gerado em ${dateStr}</p>
-        <div class="summary">
-          <div class="card"><div class="label">Receitas</div><div class="value green">${formatCurrency(pastaData.sumRec)}</div></div>
-          <div class="card"><div class="label">Despesas</div><div class="value red">${formatCurrency(pastaData.sumDesp)}</div></div>
-          <div class="card"><div class="label">Saldo</div><div class="value ${pastaData.sumRec - pastaData.sumDesp >= 0 ? 'blue' : 'red'}">${formatCurrency(pastaData.sumRec - pastaData.sumDesp)}</div></div>
+      const saldoPasta = pastaData.sumRec - pastaData.sumDesp
+      title = `Relatório — ${pastaData.pastaNome}`
+      subtitle = `Últimos ${period} meses`
+      bodyContent = `
+        <div class="kpi-row">
+          <div class="kpi"><div class="kpi-label">Total Receitas</div><div class="kpi-value green">${formatCurrency(pastaData.sumRec)}</div></div>
+          <div class="kpi"><div class="kpi-label">Total Despesas</div><div class="kpi-value red">${formatCurrency(pastaData.sumDesp)}</div></div>
+          <div class="kpi"><div class="kpi-label">Saldo</div><div class="kpi-value ${saldoPasta >= 0 ? 'blue' : 'red'}">${formatCurrency(saldoPasta)}</div></div>
         </div>
-        <h2>Despesas (${pastaData.despesas.length})</h2>
+        <h2>Despesas <span class="count">${pastaData.despesas.length} transações</span></h2>
+        ${pastaData.despesas.length > 0 ? `
         <table>
-          <thead><tr><th>Descrição</th><th>Categoria</th><th>Data</th><th>Valor</th></tr></thead>
+          <thead><tr><th>Descrição</th><th>Categoria</th><th>Data</th><th class="right">Valor</th></tr></thead>
           <tbody>
-            ${pastaData.despesas.map((tx: any) => `<tr><td>${tx.descricao}</td><td>${tx.categorias?.nome || '-'}</td><td>${formatDateShort(tx.data)}</td><td class="red">-${formatCurrency(Number(tx.valor))}</td></tr>`).join('')}
-            <tr class="total"><td colspan="3">Total Despesas</td><td class="red">-${formatCurrency(pastaData.sumDesp)}</td></tr>
+            ${pastaData.despesas.map((tx: any) => `
+              <tr>
+                <td>${tx.descricao}</td>
+                <td class="muted">${tx.categorias?.nome || '—'}</td>
+                <td class="muted">${formatDateShort(tx.data)}</td>
+                <td class="right red">-${formatCurrency(Number(tx.valor))}</td>
+              </tr>`).join('')}
           </tbody>
-        </table>
-        <h2>Receitas (${pastaData.receitas.length})</h2>
+          <tfoot>
+            <tr class="tfoot-row">
+              <td colspan="3"><strong>Total Despesas</strong></td>
+              <td class="right red"><strong>-${formatCurrency(pastaData.sumDesp)}</strong></td>
+            </tr>
+          </tfoot>
+        </table>` : '<p class="empty">Nenhuma despesa no período.</p>'}
+        <h2>Receitas <span class="count">${pastaData.receitas.length} transações</span></h2>
+        ${pastaData.receitas.length > 0 ? `
         <table>
-          <thead><tr><th>Descrição</th><th>Categoria</th><th>Data</th><th>Valor</th></tr></thead>
+          <thead><tr><th>Descrição</th><th>Categoria</th><th>Data</th><th class="right">Valor</th></tr></thead>
           <tbody>
-            ${pastaData.receitas.map((tx: any) => `<tr><td>${tx.descricao}</td><td>${tx.categorias?.nome || '-'}</td><td>${formatDateShort(tx.data)}</td><td class="green">+${formatCurrency(Number(tx.valor))}</td></tr>`).join('')}
-            <tr class="total"><td colspan="3">Total Receitas</td><td class="green">+${formatCurrency(pastaData.sumRec)}</td></tr>
+            ${pastaData.receitas.map((tx: any) => `
+              <tr>
+                <td>${tx.descricao}</td>
+                <td class="muted">${tx.categorias?.nome || '—'}</td>
+                <td class="muted">${formatDateShort(tx.data)}</td>
+                <td class="right green">+${formatCurrency(Number(tx.valor))}</td>
+              </tr>`).join('')}
           </tbody>
-        </table>
+          <tfoot>
+            <tr class="tfoot-row">
+              <td colspan="3"><strong>Total Receitas</strong></td>
+              <td class="right green"><strong>+${formatCurrency(pastaData.sumRec)}</strong></td>
+            </tr>
+          </tfoot>
+        </table>` : '<p class="empty">Nenhuma receita no período.</p>'}
       `
     } else if (tab === 'receitas') {
-      content = `
-        <h1>Relatório de Receitas por Categoria</h1>
-        <p class="sub">Últimos ${period} meses · Total: ${formatCurrency(totalReceitas)} · Gerado em ${dateStr}</p>
+      title = 'Receitas por Categoria'
+      subtitle = `Últimos ${period} meses · Total: ${formatCurrency(totalReceitas)}`
+      bodyContent = `
         <table>
-          <thead><tr><th>Categoria</th><th>Valor</th><th>%</th></tr></thead>
+          <thead><tr><th>Categoria</th><th class="right">Valor</th><th class="right">%</th></tr></thead>
           <tbody>
-            ${categoryRecData.map(cat => `<tr><td>${cat.name}</td><td class="green">${formatCurrency(cat.value)}</td><td>${totalReceitas > 0 ? ((cat.value / totalReceitas) * 100).toFixed(1) : 0}%</td></tr>`).join('')}
+            ${categoryRecData.map(cat => `
+              <tr>
+                <td>${cat.name}</td>
+                <td class="right green">${formatCurrency(cat.value)}</td>
+                <td class="right muted">${totalReceitas > 0 ? ((cat.value / totalReceitas) * 100).toFixed(1) : 0}%</td>
+              </tr>`).join('')}
           </tbody>
+          <tfoot>
+            <tr class="tfoot-row">
+              <td><strong>Total</strong></td>
+              <td class="right green"><strong>${formatCurrency(totalReceitas)}</strong></td>
+              <td class="right muted"><strong>100%</strong></td>
+            </tr>
+          </tfoot>
         </table>
       `
     }
@@ -253,22 +321,66 @@ export default function RelatoriosPage() {
     printContainer.id = 'rel-print-container'
     printContainer.innerHTML = `
       <style>
-        #rel-print-container { font-family: Arial, sans-serif; max-width: 820px; margin: 30px auto; color: #1a1a1a; }
-        #rel-print-container h1 { color: #4f46e5; border-bottom: 2px solid #4f46e5; padding-bottom: 10px; margin-bottom: 4px; font-size: 22px; }
-        #rel-print-container h2 { color: #374151; margin: 24px 0 12px; font-size: 16px; }
-        #rel-print-container .sub { color: #6b7280; font-size: 12px; margin-bottom: 20px; }
-        #rel-print-container .summary { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin: 20px 0; }
-        #rel-print-container .card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px; }
-        #rel-print-container .label { font-size: 11px; color: #6b7280; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
-        #rel-print-container .value { font-size: 20px; font-weight: bold; }
-        #rel-print-container table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
-        #rel-print-container th { background: #4f46e5; color: white; padding: 9px 12px; text-align: left; font-size: 12px; }
-        #rel-print-container td { padding: 8px 12px; border-bottom: 1px solid #f3f4f6; font-size: 13px; }
-        #rel-print-container tr:nth-child(even) td { background: #f9fafb; }
-        #rel-print-container tr.total td { font-weight: bold; background: #f3f4f6 !important; }
-        .green { color: #16a34a; } .red { color: #dc2626; } .blue { color: #2563eb; }
+        @page { margin: 18mm 20mm; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        #rel-print-container { font-family: 'Segoe UI', Arial, sans-serif; color: #111827; font-size: 13px; line-height: 1.5; }
+
+        /* Header */
+        .rpt-header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 14px; border-bottom: 2px solid #4f46e5; margin-bottom: 22px; }
+        .rpt-brand { display: flex; align-items: center; gap: 12px; }
+        .rpt-logo { width: 42px; height: 42px; background: #4f46e5; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: white; font-size: 13px; font-weight: 800; letter-spacing: -0.5px; }
+        .rpt-title { font-size: 19px; font-weight: 700; color: #111827; }
+        .rpt-subtitle { font-size: 12px; color: #6b7280; margin-top: 1px; }
+        .rpt-date { font-size: 11px; color: #9ca3af; text-align: right; line-height: 1.6; }
+
+        /* KPI strip */
+        .kpi-row { display: flex; gap: 10px; margin-bottom: 22px; }
+        .kpi { flex: 1; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px 14px; background: #f9fafb; }
+        .kpi-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: #9ca3af; margin-bottom: 5px; }
+        .kpi-value { font-size: 18px; font-weight: 700; }
+
+        /* Section heading */
+        h2 { font-size: 13px; font-weight: 600; color: #374151; text-transform: uppercase; letter-spacing: 0.05em; margin: 22px 0 10px; padding-bottom: 6px; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; gap: 8px; }
+        .count { font-size: 11px; font-weight: 400; color: #9ca3af; text-transform: none; letter-spacing: 0; }
+
+        /* Table */
+        table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+        thead th { background: #f3f4f6; color: #374151; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; padding: 8px 10px; text-align: left; border-top: 1px solid #e5e7eb; border-bottom: 1px solid #d1d5db; }
+        tbody td { padding: 7px 10px; border-bottom: 1px solid #f3f4f6; font-size: 12px; color: #374151; }
+        tbody tr:nth-child(even) td { background: #fafafa; }
+        tfoot .tfoot-row td { padding: 8px 10px; background: #f3f4f6; border-top: 1px solid #d1d5db; font-size: 12px; }
+        .right { text-align: right; }
+
+        /* Colors */
+        .green { color: #15803d; }
+        .red { color: #b91c1c; }
+        .blue { color: #1d4ed8; }
+        .muted { color: #6b7280; }
+
+        /* Footer */
+        .rpt-footer { margin-top: 28px; padding-top: 10px; border-top: 1px solid #e5e7eb; font-size: 10px; color: #9ca3af; display: flex; justify-content: space-between; }
+
+        .empty { font-size: 12px; color: #9ca3af; padding: 12px 0; }
       </style>
-      ${content}
+
+      <div class="rpt-header">
+        <div class="rpt-brand">
+          <div class="rpt-logo">R$</div>
+          <div>
+            <div class="rpt-title">${title}</div>
+            <div class="rpt-subtitle">${subtitle}</div>
+          </div>
+        </div>
+        <div class="rpt-date">Finanças App<br>Gerado em ${dateStr}</div>
+      </div>
+
+      ${bodyContent}
+
+      <div class="rpt-footer">
+        <span>Finanças App — Controle Financeiro Pessoal</span>
+        <span>${dateStr}</span>
+      </div>
     `
 
     const printStyle = document.createElement('style')
