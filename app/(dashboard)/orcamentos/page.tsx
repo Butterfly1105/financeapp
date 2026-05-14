@@ -179,35 +179,135 @@ export default function OrcamentosPage() {
   function printProposta(proposta: Proposta) {
     const itens = itensByProposta[proposta.id] || []
     const total = itens.reduce((s, i) => s + i.quantidade * i.valor_unitario, 0)
+    const dateStr = format(new Date(), "dd/MM/yyyy 'às' HH:mm")
+    const statusCfg = STATUS_CONFIG[proposta.status]
+
+    const css = `
+      @page { margin: 20mm 22mm; size: A4 portrait; }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: #fff; }
+      #orca-print-container {
+        font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+        color: #0f172a; font-size: 12px; line-height: 1.6; background: #fff;
+      }
+      .ph { display: flex; align-items: flex-start; justify-content: space-between; padding-bottom: 16px; margin-bottom: 26px; border-bottom: 2px solid #6366f1; }
+      .ph-brand { display: flex; align-items: center; gap: 14px; }
+      .ph-logo {
+        width: 48px; height: 48px;
+        background: linear-gradient(140deg, #6366f1 0%, #4338ca 100%);
+        border-radius: 12px;
+        display: flex; align-items: center; justify-content: center;
+        color: #fff; font-size: 14px; font-weight: 800; letter-spacing: -0.5px;
+      }
+      .ph-title { font-size: 20px; font-weight: 700; color: #0f172a; line-height: 1.2; }
+      .ph-sub { font-size: 12px; color: #64748b; margin-top: 4px; }
+      .ph-meta { text-align: right; font-size: 10.5px; color: #94a3b8; line-height: 1.9; }
+      .kpi-row { display: flex; gap: 10px; margin-bottom: 28px; }
+      .kpi { flex: 1; padding: 13px 14px 13px 17px; background: #fff; border: 1px solid #e2e8f0; border-left: 3px solid #e2e8f0; border-radius: 9px; }
+      .kv { border-left-color: #22c55e; }
+      .kd { border-left-color: #f43f5e; }
+      .ki { border-left-color: #6366f1; }
+      .kn { border-left-color: #94a3b8; }
+      .kpi-label { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #94a3b8; margin-bottom: 7px; }
+      .kpi-value { font-size: 15px; font-weight: 700; color: #0f172a; }
+      .sec-title {
+        font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
+        color: #64748b; margin: 0 0 10px;
+        padding-bottom: 7px; border-bottom: 1px solid #e2e8f0;
+      }
+      .desc-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px; margin-bottom: 20px; font-size: 11.5px; color: #475569; font-style: italic; }
+      table { width: 100%; border-collapse: collapse; border: 1px solid #e2e8f0; overflow: hidden; margin-bottom: 4px; }
+      thead th {
+        background: #f8fafc; color: #475569;
+        font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+        padding: 9px 13px; text-align: left;
+        border-bottom: 1px solid #e2e8f0;
+      }
+      tbody td { padding: 8px 13px; font-size: 11.5px; color: #334155; border-bottom: 1px solid #f1f5f9; }
+      tbody tr:last-child td { border-bottom: none; }
+      tbody tr:nth-child(even) td { background: #fafafa; }
+      tfoot td { padding: 9px 13px; font-size: 11.5px; font-weight: 700; background: #f1f5f9; border-top: 2px solid #e2e8f0; color: #0f172a; }
+      .ar { text-align: right; }
+      .ac { text-align: center; }
+      .cv { color: #16a34a; }
+      .ci { color: #4f46e5; }
+      .mu { color: #94a3b8; font-size: 11px; }
+      .pf { margin-top: 34px; padding-top: 11px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; font-size: 10px; color: #94a3b8; }
+    `
+
+    const statusColor = proposta.status === 'aprovado' ? '#16a34a' : proposta.status === 'recusado' ? '#dc2626' : proposta.status === 'enviado' ? '#2563eb' : '#94a3b8'
 
     const printContainer = document.createElement('div')
     printContainer.id = 'orca-print-container'
     printContainer.innerHTML = `
-      <style>
-        #orca-print-container { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; color: #1a1a1a; }
-        #orca-print-container h1 { color: #4f46e5; border-bottom: 2px solid #4f46e5; padding-bottom: 10px; }
-        #orca-print-container .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; background: #f8f8f8; padding: 16px; border-radius: 8px; }
-        #orca-print-container .meta p { margin: 4px 0; font-size: 14px; }
-        #orca-print-container .meta strong { color: #444; }
-        #orca-print-container table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-        #orca-print-container th { background: #4f46e5; color: white; padding: 10px 12px; text-align: left; }
-        #orca-print-container td { padding: 10px 12px; border-bottom: 1px solid #eee; }
-        #orca-print-container tr:nth-child(even) td { background: #fafafa; }
-        #orca-print-container .total { font-size: 20px; font-weight: bold; color: #4f46e5; text-align: right; margin-top: 16px; }
-        #orca-print-container .footer { margin-top: 40px; font-size: 12px; color: #888; border-top: 1px solid #eee; padding-top: 10px; }
-      </style>
-      <h1>${proposta.titulo}</h1>
-      <div class="meta">
-        <div><p><strong>Cliente:</strong> ${proposta.cliente_nome}</p>${proposta.cliente_email ? `<p><strong>Email:</strong> ${proposta.cliente_email}</p>` : ''}</div>
-        <div><p><strong>Status:</strong> ${STATUS_CONFIG[proposta.status]?.label}</p>${proposta.data_validade ? `<p><strong>Válido até:</strong> ${proposta.data_validade}</p>` : ''}<p><strong>Data:</strong> ${format(new Date(proposta.created_at), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</p></div>
+      <style>${css}</style>
+      <div class="ph">
+        <div class="ph-brand">
+          <div class="ph-logo">R$</div>
+          <div>
+            <div class="ph-title">${proposta.titulo}</div>
+            <div class="ph-sub">Orçamento / Proposta Comercial</div>
+          </div>
+        </div>
+        <div class="ph-meta">
+          Finanças App<br>
+          Gerado em ${dateStr}
+        </div>
       </div>
-      ${proposta.descricao ? `<p style="margin:16px 0;color:#555;">${proposta.descricao}</p>` : ''}
+      <div class="kpi-row">
+        <div class="kpi kn">
+          <div class="kpi-label">Cliente</div>
+          <div class="kpi-value">${proposta.cliente_nome}</div>
+          ${proposta.cliente_email ? `<div style="font-size:10px;color:#94a3b8;margin-top:3px">${proposta.cliente_email}</div>` : ''}
+        </div>
+        <div class="kpi kn">
+          <div class="kpi-label">Status</div>
+          <div class="kpi-value" style="color:${statusColor}">${statusCfg?.label || proposta.status}</div>
+        </div>
+        <div class="kpi kn">
+          <div class="kpi-label">Data</div>
+          <div class="kpi-value">${format(new Date(proposta.created_at), "dd/MM/yyyy", { locale: ptBR })}</div>
+          ${proposta.data_validade ? `<div style="font-size:10px;color:#94a3b8;margin-top:3px">Válido até: ${proposta.data_validade}</div>` : ''}
+        </div>
+        <div class="kpi ki">
+          <div class="kpi-label">Total da Proposta</div>
+          <div class="kpi-value ci" style="font-size:19px">${formatCurrency(total)}</div>
+        </div>
+      </div>
+      ${proposta.descricao ? `<div class="desc-box">${proposta.descricao}</div>` : ''}
+      <div class="sec-title">Itens da Proposta</div>
+      ${itens.length > 0 ? `
       <table>
-        <thead><tr><th>Descrição</th><th>Categoria</th><th style="text-align:center">Qtd</th><th style="text-align:right">Valor Unit.</th><th style="text-align:right">Total</th></tr></thead>
-        <tbody>${itens.map(i => `<tr><td>${i.descricao}</td><td>${i.categoria || '-'}</td><td style="text-align:center">${i.quantidade}</td><td style="text-align:right">${formatCurrency(i.valor_unitario)}</td><td style="text-align:right">${formatCurrency(i.quantidade * i.valor_unitario)}</td></tr>`).join('')}</tbody>
-      </table>
-      <div class="total">Total: ${formatCurrency(total)}</div>
-      <div class="footer">Orçamento gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm")}</div>
+        <thead>
+          <tr>
+            <th>Descrição</th>
+            <th>Categoria</th>
+            <th class="ac">Qtd</th>
+            <th class="ar">Valor Unit.</th>
+            <th class="ar">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${itens.map(i => `
+            <tr>
+              <td>${i.descricao}</td>
+              <td class="mu">${i.categoria || '—'}</td>
+              <td class="ac mu">${i.quantidade}</td>
+              <td class="ar mu">${formatCurrency(i.valor_unitario)}</td>
+              <td class="ar" style="font-weight:600">${formatCurrency(i.quantidade * i.valor_unitario)}</td>
+            </tr>`).join('')}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="4">Total Geral</td>
+            <td class="ar ci">${formatCurrency(total)}</td>
+          </tr>
+        </tfoot>
+      </table>` : '<p style="font-size:11.5px;color:#94a3b8;font-style:italic;padding:8px 0">Nenhum item adicionado.</p>'}
+      <div class="pf">
+        <span>Finanças App — Controle Financeiro Pessoal</span>
+        <span>${dateStr}</span>
+      </div>
     `
 
     const printStyle = document.createElement('style')
