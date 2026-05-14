@@ -18,6 +18,7 @@ export default function PastasPage() {
   const [descricao, setDescricao] = useState('')
   const [cor, setCor] = useState('#6366f1')
   const [saving, setSaving] = useState(false)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   const loadPastas = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -99,10 +100,10 @@ export default function PastasPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Excluir esta pasta? As transações dentro dela não serão excluídas.')) return
     const { error } = await supabase.from('pastas').delete().eq('id', id)
     if (error) toast.error('Erro ao excluir pasta')
     else { toast.success('Pasta excluída'); loadPastas() }
+    setConfirmDeleteId(null)
   }
 
   if (loading) {
@@ -166,7 +167,7 @@ export default function PastasPage() {
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex items-center gap-1">
                   <button
                     onClick={() => openEditForm(pasta)}
                     className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
@@ -174,7 +175,7 @@ export default function PastasPage() {
                     <Edit2 className="w-3.5 h-3.5" />
                   </button>
                   <button
-                    onClick={() => handleDelete(pasta.id)}
+                    onClick={() => setConfirmDeleteId(pasta.id)}
                     className="p-1.5 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -212,6 +213,19 @@ export default function PastasPage() {
               </Link>
             </div>
           ))}
+        </div>
+      )}
+
+      {confirmDeleteId && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setConfirmDeleteId(null)}>
+          <div className="bg-[#18181b] border border-zinc-700 rounded-2xl w-full max-w-xs shadow-2xl p-6" onClick={e => e.stopPropagation()}>
+            <p className="text-sm font-semibold text-zinc-200 mb-1">Excluir pasta?</p>
+            <p className="text-xs text-zinc-500 mb-5">As transações dentro dela não serão excluídas.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmDeleteId(null)} className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl py-2.5 text-sm font-medium transition-colors">Cancelar</button>
+              <button onClick={() => handleDelete(confirmDeleteId)} className="flex-1 bg-rose-600 hover:bg-rose-500 text-white rounded-xl py-2.5 text-sm font-semibold transition-colors">Excluir</button>
+            </div>
+          </div>
         </div>
       )}
 

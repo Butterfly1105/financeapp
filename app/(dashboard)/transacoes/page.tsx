@@ -43,6 +43,7 @@ export default function TransacoesPage() {
   const [status, setStatus] = useState<'pago' | 'pendente'>('pago')
   const [notas, setNotas] = useState('')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   const loadData = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -161,9 +162,10 @@ export default function TransacoesPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Excluir esta transação?')) return
     await supabase.from('transacoes').delete().eq('id', id)
-    toast.success('Excluída!'); loadData()
+    toast.success('Excluída!')
+    setConfirmDeleteId(null)
+    loadData()
   }
 
   function toggleTag(tagId: string) {
@@ -327,7 +329,7 @@ export default function TransacoesPage() {
                       <button onClick={() => openEditForm(tx)} className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors">
                         <Edit2 className="w-3.5 h-3.5" />
                       </button>
-                      <button onClick={() => handleDelete(tx.id)} className="p-1.5 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors">
+                      <button onClick={() => setConfirmDeleteId(tx.id)} className="p-1.5 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -505,6 +507,19 @@ export default function TransacoesPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {confirmDeleteId && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setConfirmDeleteId(null)}>
+          <div className="bg-[#18181b] border border-zinc-700 rounded-2xl w-full max-w-xs shadow-2xl p-6" onClick={e => e.stopPropagation()}>
+            <p className="text-sm font-semibold text-zinc-200 mb-1">Excluir transação?</p>
+            <p className="text-xs text-zinc-500 mb-5">Essa ação não pode ser desfeita.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmDeleteId(null)} className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl py-2.5 text-sm font-medium transition-colors">Cancelar</button>
+              <button onClick={() => handleDelete(confirmDeleteId)} className="flex-1 bg-rose-600 hover:bg-rose-500 text-white rounded-xl py-2.5 text-sm font-semibold transition-colors">Excluir</button>
+            </div>
           </div>
         </div>
       )}

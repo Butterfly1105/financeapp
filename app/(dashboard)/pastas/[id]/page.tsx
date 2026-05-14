@@ -50,8 +50,10 @@ export default function PastaDetailPage() {
   const [periodo, setPeriodo] = useState('mensal')
   const [dataFim, setDataFim] = useState('')
   const [numeroParcelas, setNumeroParcelas] = useState('')
+  const [status, setStatus] = useState<'pago' | 'pendente'>('pago')
   const [notas, setNotas] = useState('')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   const loadData = useCallback(async () => {
     const { data: pastaData } = await supabase.from('pastas').select('*').eq('id', id).single()
@@ -103,6 +105,7 @@ export default function PastaDetailPage() {
     setPeriodo('mensal')
     setDataFim('')
     setNumeroParcelas('')
+    setStatus('pago')
     setNotas('')
     setSelectedTags([])
     setEditingTx(null)
@@ -121,6 +124,7 @@ export default function PastaDetailPage() {
     setValor(String(tx.valor))
     setData(tx.data)
     setCategoriaId(tx.categoria_id || '')
+    setStatus(tx.status === 'pendente' ? 'pendente' : 'pago')
     setNotas(tx.notas || '')
 
     if (tx.recorrente) {
@@ -163,7 +167,7 @@ export default function PastaDetailPage() {
       data_inicio_recorrencia: isRecurrent ? data : null,
       data_fim_recorrencia: isRecurrent && dataFim ? dataFim : null,
       notas: notas || null,
-      status: 'pago',
+      status,
     }
 
     let transactionId: string | null = null
@@ -192,10 +196,10 @@ export default function PastaDetailPage() {
   }
 
   async function handleDelete(txId: string) {
-    if (!confirm('Excluir esta transação?')) return
     const { error } = await supabase.from('transacoes').delete().eq('id', txId)
     if (error) toast.error('Erro ao excluir')
     else { toast.success('Excluída!'); loadData() }
+    setConfirmDeleteId(null)
   }
 
   function toggleTag(tagId: string) {
@@ -409,6 +413,9 @@ export default function PastaDetailPage() {
                           {tx.data_fim_recorrencia ? 'Parcelado' : recurrencePeriodLabel(tx.periodo_recorrencia!)}
                         </span>
                       )}
+                      {tx.status === 'pendente' && (
+                        <span className="text-[10px] text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 px-1.5 py-0.5 rounded-md">Pendente</span>
+                      )}
                       {(tx as any).categorias && (
                         <span
                           className="text-[10px] px-1.5 py-0.5 rounded-md"
@@ -429,7 +436,7 @@ export default function PastaDetailPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className={`text-sm font-bold ${tx.tipo === 'receita' ? 'text-green-400' : 'text-rose-400'}`}>
+                    <span className={`text-sm font-bold ${tx.tipo === 'receita' ? 'text-green-400' : 'text-rose-400'} ${tx.status === 'pendente' ? 'opacity-50' : ''}`}>
                       {tx.tipo === 'receita' ? '+' : '-'}{formatCurrencyCompact(Number(tx.valor))}
                     </span>
                     <div className="flex items-center gap-0.5">
@@ -441,7 +448,7 @@ export default function PastaDetailPage() {
                         <Edit2 className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={() => handleDelete(tx.id)}
+                        onClick={() => setConfirmDeleteId(tx.id)}
                         className="p-1.5 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
                         title="Excluir"
                       >
@@ -455,6 +462,19 @@ export default function PastaDetailPage() {
           </div>
         )}
       </div>
+
+      {confirmDeleteId && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setConfirmDeleteId(null)}>
+          <div className="bg-[#18181b] border border-zinc-700 rounded-2xl w-full max-w-xs shadow-2xl p-6" onClick={e => e.stopPropagation()}>
+            <p className="text-sm font-semibold text-zinc-200 mb-1">Excluir transação?</p>
+            <p className="text-xs text-zinc-500 mb-5">Essa ação não pode ser desfeita.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmDeleteId(null)} className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl py-2.5 text-sm font-medium transition-colors">Cancelar</button>
+              <button onClick={() => handleDelete(confirmDeleteId)} className="flex-1 bg-rose-600 hover:bg-rose-500 text-white rounded-xl py-2.5 text-sm font-semibold transition-colors">Excluir</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Transaction Form Modal */}
       {showForm && (
@@ -533,6 +553,17 @@ export default function PastaDetailPage() {
                   </div>
                 </div>
               )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-2">Status</label>
+                  <select value={status} onChange={e => setStatus(e.target.value as any)}
+                    className="w-full bg-[#1c1c1f] border border-zinc-700 rounded-xl px-4 py-3 text-zinc-100 text-sm focus:outline-none focus:border-indigo-500">
+                    <option value="pago">Pago</option>
+                    <option value="pendente">Pendente</option>
+                  </select>
+                </div>
+              </div>
 
               {/* Recorrência */}
               <div>
