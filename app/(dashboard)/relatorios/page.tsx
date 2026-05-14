@@ -196,188 +196,213 @@ export default function RelatoriosPage() {
     let bodyContent = ''
 
     if (tab === 'geral') {
+      const saldoTotal = totalReceitas - totalDespesas
       title = 'Relatório Geral'
       subtitle = `Últimos ${period} meses`
-      const saldoTotal = totalReceitas - totalDespesas
       bodyContent = `
         <div class="kpi-row">
-          <div class="kpi"><div class="kpi-label">Total Receitas</div><div class="kpi-value green">${formatCurrency(totalReceitas)}</div></div>
-          <div class="kpi"><div class="kpi-label">Total Despesas</div><div class="kpi-value red">${formatCurrency(totalDespesas)}</div></div>
-          <div class="kpi"><div class="kpi-label">Saldo do Período</div><div class="kpi-value ${saldoTotal >= 0 ? 'blue' : 'red'}">${formatCurrency(saldoTotal)}</div></div>
-          <div class="kpi"><div class="kpi-label">Saldo Médio/Mês</div><div class="kpi-value ${saldoMedio >= 0 ? 'blue' : 'red'}">${formatCurrency(saldoMedio)}</div></div>
+          <div class="kpi kv">
+            <div class="kpi-label">Total Receitas</div>
+            <div class="kpi-value cv">${formatCurrency(totalReceitas)}</div>
+          </div>
+          <div class="kpi kd">
+            <div class="kpi-label">Total Despesas</div>
+            <div class="kpi-value cd">${formatCurrency(totalDespesas)}</div>
+          </div>
+          <div class="kpi ${saldoTotal >= 0 ? 'ki' : 'kd'}">
+            <div class="kpi-label">Saldo do Período</div>
+            <div class="kpi-value ${saldoTotal >= 0 ? 'ci' : 'cd'}">${formatCurrency(saldoTotal)}</div>
+          </div>
+          <div class="kpi ${saldoMedio >= 0 ? 'ki' : 'kd'}">
+            <div class="kpi-label">Saldo Médio / Mês</div>
+            <div class="kpi-value ${saldoMedio >= 0 ? 'ci' : 'cd'}">${formatCurrency(saldoMedio)}</div>
+          </div>
         </div>
-        <h2>Evolução Mensal</h2>
+        <div class="sec-title">Evolução Mensal</div>
         <table>
-          <thead><tr><th>Mês</th><th class="right">Receitas</th><th class="right">Despesas</th><th class="right">Saldo</th></tr></thead>
+          <thead>
+            <tr><th>Mês</th><th class="ar">Receitas</th><th class="ar">Despesas</th><th class="ar">Saldo</th></tr>
+          </thead>
           <tbody>
             ${monthlyData.map(d => `
               <tr>
                 <td>${d.mes}</td>
-                <td class="right green">${formatCurrency(d.receitas)}</td>
-                <td class="right red">${formatCurrency(d.despesas)}</td>
-                <td class="right ${d.saldo >= 0 ? 'blue' : 'red'}">${formatCurrency(d.saldo)}</td>
+                <td class="ar cv">${formatCurrency(d.receitas)}</td>
+                <td class="ar cd">${formatCurrency(d.despesas)}</td>
+                <td class="ar ${d.saldo >= 0 ? 'ci' : 'cd'}">${formatCurrency(d.saldo)}</td>
               </tr>`).join('')}
           </tbody>
           <tfoot>
-            <tr class="tfoot-row">
-              <td><strong>Total</strong></td>
-              <td class="right green"><strong>${formatCurrency(totalReceitas)}</strong></td>
-              <td class="right red"><strong>${formatCurrency(totalDespesas)}</strong></td>
-              <td class="right ${saldoTotal >= 0 ? 'blue' : 'red'}"><strong>${formatCurrency(saldoTotal)}</strong></td>
+            <tr>
+              <td>Total</td>
+              <td class="ar cv">${formatCurrency(totalReceitas)}</td>
+              <td class="ar cd">${formatCurrency(totalDespesas)}</td>
+              <td class="ar ${saldoTotal >= 0 ? 'ci' : 'cd'}">${formatCurrency(saldoTotal)}</td>
             </tr>
           </tfoot>
         </table>
         ${categoryDespData.length > 0 ? `
-        <h2>Despesas por Categoria</h2>
+        <div class="sec-title" style="margin-top:24px">Despesas por Categoria</div>
         <table>
-          <thead><tr><th>Categoria</th><th class="right">Valor</th><th class="right">%</th></tr></thead>
+          <thead><tr><th>Categoria</th><th class="ar">Total</th><th class="ar">%</th></tr></thead>
           <tbody>
-            ${categoryDespData.map(cat => `
-              <tr>
-                <td>${cat.name}</td>
-                <td class="right red">${formatCurrency(cat.value)}</td>
-                <td class="right muted">${totalDespesas > 0 ? ((cat.value / totalDespesas) * 100).toFixed(1) : 0}%</td>
-              </tr>`).join('')}
+            ${categoryDespData.map(cat => {
+              const pct = totalDespesas > 0 ? ((cat.value / totalDespesas) * 100).toFixed(1) : '0.0'
+              return `<tr><td>${cat.name}</td><td class="ar cd">${formatCurrency(cat.value)}</td><td class="ar mu">${pct}%</td></tr>`
+            }).join('')}
           </tbody>
+          <tfoot><tr><td>Total</td><td class="ar cd">${formatCurrency(totalDespesas)}</td><td class="ar mu">100%</td></tr></tfoot>
         </table>` : ''}
       `
     } else if (tab === 'pasta' && pastaData) {
       const saldoPasta = pastaData.sumRec - pastaData.sumDesp
-      title = `Relatório — ${pastaData.pastaNome}`
+      title = pastaData.pastaNome
       subtitle = `Últimos ${period} meses`
       bodyContent = `
         <div class="kpi-row">
-          <div class="kpi"><div class="kpi-label">Total Receitas</div><div class="kpi-value green">${formatCurrency(pastaData.sumRec)}</div></div>
-          <div class="kpi"><div class="kpi-label">Total Despesas</div><div class="kpi-value red">${formatCurrency(pastaData.sumDesp)}</div></div>
-          <div class="kpi"><div class="kpi-label">Saldo</div><div class="kpi-value ${saldoPasta >= 0 ? 'blue' : 'red'}">${formatCurrency(saldoPasta)}</div></div>
+          <div class="kpi kv">
+            <div class="kpi-label">Total Receitas</div>
+            <div class="kpi-value cv">${formatCurrency(pastaData.sumRec)}</div>
+          </div>
+          <div class="kpi kd">
+            <div class="kpi-label">Total Despesas</div>
+            <div class="kpi-value cd">${formatCurrency(pastaData.sumDesp)}</div>
+          </div>
+          <div class="kpi ${saldoPasta >= 0 ? 'ki' : 'kd'}">
+            <div class="kpi-label">Saldo</div>
+            <div class="kpi-value ${saldoPasta >= 0 ? 'ci' : 'cd'}">${formatCurrency(saldoPasta)}</div>
+          </div>
         </div>
-        <h2>Despesas <span class="count">${pastaData.despesas.length} transações</span></h2>
+        <div class="sec-title">Despesas <span class="badge">${pastaData.despesas.length} lançamentos</span></div>
         ${pastaData.despesas.length > 0 ? `
         <table>
-          <thead><tr><th>Descrição</th><th>Categoria</th><th>Data</th><th class="right">Valor</th></tr></thead>
+          <thead><tr><th>Descrição</th><th>Categoria</th><th>Data</th><th class="ar">Valor</th></tr></thead>
           <tbody>
             ${pastaData.despesas.map((tx: any) => `
               <tr>
                 <td>${tx.descricao}</td>
-                <td class="muted">${tx.categorias?.nome || '—'}</td>
-                <td class="muted">${formatDateShort(tx.data)}</td>
-                <td class="right red">-${formatCurrency(Number(tx.valor))}</td>
+                <td class="mu">${tx.categorias?.nome || '—'}</td>
+                <td class="mu">${formatDateShort(tx.data)}</td>
+                <td class="ar cd">-${formatCurrency(Number(tx.valor))}</td>
               </tr>`).join('')}
           </tbody>
-          <tfoot>
-            <tr class="tfoot-row">
-              <td colspan="3"><strong>Total Despesas</strong></td>
-              <td class="right red"><strong>-${formatCurrency(pastaData.sumDesp)}</strong></td>
-            </tr>
-          </tfoot>
+          <tfoot><tr><td colspan="3">Total Despesas</td><td class="ar cd">-${formatCurrency(pastaData.sumDesp)}</td></tr></tfoot>
         </table>` : '<p class="empty">Nenhuma despesa no período.</p>'}
-        <h2>Receitas <span class="count">${pastaData.receitas.length} transações</span></h2>
+        <div class="sec-title" style="margin-top:24px">Receitas <span class="badge">${pastaData.receitas.length} lançamentos</span></div>
         ${pastaData.receitas.length > 0 ? `
         <table>
-          <thead><tr><th>Descrição</th><th>Categoria</th><th>Data</th><th class="right">Valor</th></tr></thead>
+          <thead><tr><th>Descrição</th><th>Categoria</th><th>Data</th><th class="ar">Valor</th></tr></thead>
           <tbody>
             ${pastaData.receitas.map((tx: any) => `
               <tr>
                 <td>${tx.descricao}</td>
-                <td class="muted">${tx.categorias?.nome || '—'}</td>
-                <td class="muted">${formatDateShort(tx.data)}</td>
-                <td class="right green">+${formatCurrency(Number(tx.valor))}</td>
+                <td class="mu">${tx.categorias?.nome || '—'}</td>
+                <td class="mu">${formatDateShort(tx.data)}</td>
+                <td class="ar cv">+${formatCurrency(Number(tx.valor))}</td>
               </tr>`).join('')}
           </tbody>
-          <tfoot>
-            <tr class="tfoot-row">
-              <td colspan="3"><strong>Total Receitas</strong></td>
-              <td class="right green"><strong>+${formatCurrency(pastaData.sumRec)}</strong></td>
-            </tr>
-          </tfoot>
+          <tfoot><tr><td colspan="3">Total Receitas</td><td class="ar cv">+${formatCurrency(pastaData.sumRec)}</td></tr></tfoot>
         </table>` : '<p class="empty">Nenhuma receita no período.</p>'}
       `
     } else if (tab === 'receitas') {
       title = 'Receitas por Categoria'
-      subtitle = `Últimos ${period} meses · Total: ${formatCurrency(totalReceitas)}`
+      subtitle = `Últimos ${period} meses`
       bodyContent = `
         <table>
-          <thead><tr><th>Categoria</th><th class="right">Valor</th><th class="right">%</th></tr></thead>
+          <thead><tr><th>Categoria</th><th class="ar">Valor</th><th class="ar">%</th></tr></thead>
           <tbody>
-            ${categoryRecData.map(cat => `
-              <tr>
-                <td>${cat.name}</td>
-                <td class="right green">${formatCurrency(cat.value)}</td>
-                <td class="right muted">${totalReceitas > 0 ? ((cat.value / totalReceitas) * 100).toFixed(1) : 0}%</td>
-              </tr>`).join('')}
+            ${categoryRecData.map(cat => {
+              const pct = totalReceitas > 0 ? ((cat.value / totalReceitas) * 100).toFixed(1) : '0.0'
+              return `<tr><td>${cat.name}</td><td class="ar cv">${formatCurrency(cat.value)}</td><td class="ar mu">${pct}%</td></tr>`
+            }).join('')}
           </tbody>
-          <tfoot>
-            <tr class="tfoot-row">
-              <td><strong>Total</strong></td>
-              <td class="right green"><strong>${formatCurrency(totalReceitas)}</strong></td>
-              <td class="right muted"><strong>100%</strong></td>
-            </tr>
-          </tfoot>
+          <tfoot><tr><td>Total</td><td class="ar cv">${formatCurrency(totalReceitas)}</td><td class="ar mu">100%</td></tr></tfoot>
         </table>
       `
     }
 
+    const css = `
+      @page { margin: 20mm 22mm; size: A4 portrait; }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: #fff; }
+      #rel-print-container {
+        font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+        color: #0f172a; font-size: 12px; line-height: 1.6; background: #fff;
+      }
+
+      /* ── HEADER ── */
+      .ph { display: flex; align-items: flex-start; justify-content: space-between; padding-bottom: 16px; margin-bottom: 26px; border-bottom: 2px solid #6366f1; }
+      .ph-brand { display: flex; align-items: center; gap: 14px; }
+      .ph-logo {
+        width: 48px; height: 48px;
+        background: linear-gradient(140deg, #6366f1 0%, #4338ca 100%);
+        border-radius: 12px;
+        display: flex; align-items: center; justify-content: center;
+        color: #fff; font-size: 14px; font-weight: 800; letter-spacing: -0.5px;
+      }
+      .ph-title { font-size: 20px; font-weight: 700; color: #0f172a; line-height: 1.2; }
+      .ph-sub { font-size: 12px; color: #64748b; margin-top: 4px; }
+      .ph-meta { text-align: right; font-size: 10.5px; color: #94a3b8; line-height: 1.9; }
+
+      /* ── KPI STRIP ── */
+      .kpi-row { display: flex; gap: 10px; margin-bottom: 28px; }
+      .kpi { flex: 1; padding: 13px 14px 13px 17px; background: #fff; border: 1px solid #e2e8f0; border-left: 3px solid #e2e8f0; border-radius: 9px; }
+      .kv { border-left-color: #22c55e; }
+      .kd { border-left-color: #f43f5e; }
+      .ki { border-left-color: #6366f1; }
+      .kpi-label { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #94a3b8; margin-bottom: 7px; }
+      .kpi-value { font-size: 19px; font-weight: 700; color: #0f172a; }
+
+      /* ── SECTION TITLE ── */
+      .sec-title {
+        font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
+        color: #64748b; margin: 0 0 10px;
+        padding-bottom: 7px; border-bottom: 1px solid #e2e8f0;
+        display: flex; align-items: center; justify-content: space-between;
+      }
+      .badge { font-size: 10px; font-weight: 400; color: #94a3b8; text-transform: none; letter-spacing: 0; }
+
+      /* ── TABLE ── */
+      table { width: 100%; border-collapse: collapse; border: 1px solid #e2e8f0; overflow: hidden; margin-bottom: 4px; }
+      thead th {
+        background: #f8fafc; color: #475569;
+        font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+        padding: 9px 13px; text-align: left;
+        border-bottom: 1px solid #e2e8f0;
+      }
+      tbody td { padding: 8px 13px; font-size: 11.5px; color: #334155; border-bottom: 1px solid #f1f5f9; }
+      tbody tr:last-child td { border-bottom: none; }
+      tbody tr:nth-child(even) td { background: #fafafa; }
+      tfoot td { padding: 9px 13px; font-size: 11.5px; font-weight: 700; background: #f1f5f9; border-top: 2px solid #e2e8f0; color: #0f172a; }
+
+      /* ── UTILITIES ── */
+      .ar { text-align: right; }
+      .cv { color: #16a34a; }
+      .cd { color: #dc2626; }
+      .ci { color: #4f46e5; }
+      .mu { color: #94a3b8; font-size: 11px; }
+      .empty { font-size: 11.5px; color: #94a3b8; padding: 10px 0; font-style: italic; }
+
+      /* ── FOOTER ── */
+      .pf { margin-top: 34px; padding-top: 11px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; font-size: 10px; color: #94a3b8; }
+    `
+
     const printContainer = document.createElement('div')
     printContainer.id = 'rel-print-container'
     printContainer.innerHTML = `
-      <style>
-        @page { margin: 18mm 20mm; }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        #rel-print-container { font-family: 'Segoe UI', Arial, sans-serif; color: #111827; font-size: 13px; line-height: 1.5; }
-
-        /* Header */
-        .rpt-header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 14px; border-bottom: 2px solid #4f46e5; margin-bottom: 22px; }
-        .rpt-brand { display: flex; align-items: center; gap: 12px; }
-        .rpt-logo { width: 42px; height: 42px; background: #4f46e5; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: white; font-size: 13px; font-weight: 800; letter-spacing: -0.5px; }
-        .rpt-title { font-size: 19px; font-weight: 700; color: #111827; }
-        .rpt-subtitle { font-size: 12px; color: #6b7280; margin-top: 1px; }
-        .rpt-date { font-size: 11px; color: #9ca3af; text-align: right; line-height: 1.6; }
-
-        /* KPI strip */
-        .kpi-row { display: flex; gap: 10px; margin-bottom: 22px; }
-        .kpi { flex: 1; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px 14px; background: #f9fafb; }
-        .kpi-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: #9ca3af; margin-bottom: 5px; }
-        .kpi-value { font-size: 18px; font-weight: 700; }
-
-        /* Section heading */
-        h2 { font-size: 13px; font-weight: 600; color: #374151; text-transform: uppercase; letter-spacing: 0.05em; margin: 22px 0 10px; padding-bottom: 6px; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; gap: 8px; }
-        .count { font-size: 11px; font-weight: 400; color: #9ca3af; text-transform: none; letter-spacing: 0; }
-
-        /* Table */
-        table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
-        thead th { background: #f3f4f6; color: #374151; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; padding: 8px 10px; text-align: left; border-top: 1px solid #e5e7eb; border-bottom: 1px solid #d1d5db; }
-        tbody td { padding: 7px 10px; border-bottom: 1px solid #f3f4f6; font-size: 12px; color: #374151; }
-        tbody tr:nth-child(even) td { background: #fafafa; }
-        tfoot .tfoot-row td { padding: 8px 10px; background: #f3f4f6; border-top: 1px solid #d1d5db; font-size: 12px; }
-        .right { text-align: right; }
-
-        /* Colors */
-        .green { color: #15803d; }
-        .red { color: #b91c1c; }
-        .blue { color: #1d4ed8; }
-        .muted { color: #6b7280; }
-
-        /* Footer */
-        .rpt-footer { margin-top: 28px; padding-top: 10px; border-top: 1px solid #e5e7eb; font-size: 10px; color: #9ca3af; display: flex; justify-content: space-between; }
-
-        .empty { font-size: 12px; color: #9ca3af; padding: 12px 0; }
-      </style>
-
-      <div class="rpt-header">
-        <div class="rpt-brand">
-          <div class="rpt-logo">R$</div>
+      <style>${css}</style>
+      <div class="ph">
+        <div class="ph-brand">
+          <div class="ph-logo">R$</div>
           <div>
-            <div class="rpt-title">${title}</div>
-            <div class="rpt-subtitle">${subtitle}</div>
+            <div class="ph-title">${title}</div>
+            <div class="ph-sub">${subtitle}</div>
           </div>
         </div>
-        <div class="rpt-date">Finanças App<br>Gerado em ${dateStr}</div>
+        <div class="ph-meta">Finanças App<br>Gerado em ${dateStr}</div>
       </div>
-
       ${bodyContent}
-
-      <div class="rpt-footer">
+      <div class="pf">
         <span>Finanças App — Controle Financeiro Pessoal</span>
         <span>${dateStr}</span>
       </div>
