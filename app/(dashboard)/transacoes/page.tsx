@@ -296,6 +296,9 @@ export default function TransacoesPage() {
                           {tx.data_fim_recorrencia ? 'Parcelado' : 'Fixo'}
                         </span>
                       )}
+                      {tx.status === 'pago' && (
+                        <span className="text-[10px] text-green-400 bg-green-500/10 border border-green-500/20 px-1.5 py-0.5 rounded-md">Pago</span>
+                      )}
                       {tx.status === 'pendente' && (
                         <span className="text-[10px] text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 px-1.5 py-0.5 rounded-md">Pendente</span>
                       )}
