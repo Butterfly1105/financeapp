@@ -60,7 +60,7 @@ export default function PastaDetailPage() {
   const [periodo, setPeriodo] = useState('mensal')
   const [dataFim, setDataFim] = useState('')
   const [numeroParcelas, setNumeroParcelas] = useState('')
-  const [status, setStatus] = useState<'pago' | 'pendente'>('pago')
+  const [status, setStatus] = useState<'pago' | 'pendente' | 'nenhum'>('nenhum')
   const [notas, setNotas] = useState('')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
@@ -124,7 +124,7 @@ export default function PastaDetailPage() {
     setPeriodo('mensal')
     setDataFim('')
     setNumeroParcelas('')
-    setStatus('pago')
+    setStatus('nenhum')
     setNotas('')
     setSelectedTags([])
     setParcelasCustom([])
@@ -144,7 +144,7 @@ export default function PastaDetailPage() {
     setValor(String(tx.valor))
     setData(tx.data)
     setCategoriaId(tx.categoria_id || '')
-    setStatus(tx.status === 'pendente' ? 'pendente' : 'pago')
+    setStatus(tx.status === 'pendente' ? 'pendente' : tx.status === 'pago' ? 'pago' : 'nenhum')
     setNotas(tx.notas || '')
 
     if (tx.recorrente) {
@@ -184,7 +184,7 @@ export default function PastaDetailPage() {
         descricao: `${descricao} (${i + 1}/${n})`,
         valor: parseFloat(v) > 0 ? parseFloat(v) : numValor,
         data: getInstallDate(data, i, periodo),
-        status,
+        status: status === 'nenhum' ? null : status,
         recorrente: false,
         periodo_recorrencia: null,
         data_inicio_recorrencia: null,
@@ -222,7 +222,7 @@ export default function PastaDetailPage() {
       data_inicio_recorrencia: isRecurrent ? data : null,
       data_fim_recorrencia: isRecurrent && dataFim ? dataFim : null,
       notas: notas || null,
-      status,
+      status: status === 'nenhum' ? null : status,
     }
 
     let transactionId: string | null = null
@@ -622,6 +622,7 @@ export default function PastaDetailPage() {
                   <label className="block text-sm font-medium text-zinc-300 mb-2">Status</label>
                   <select value={status} onChange={e => setStatus(e.target.value as any)}
                     className="w-full bg-[#1c1c1f] border border-zinc-700 rounded-xl px-4 py-3 text-zinc-100 text-sm focus:outline-none focus:border-indigo-500">
+                    <option value="nenhum">Nenhum</option>
                     <option value="pago">Pago</option>
                     <option value="pendente">Pendente</option>
                   </select>
