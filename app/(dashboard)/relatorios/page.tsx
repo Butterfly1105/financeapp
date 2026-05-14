@@ -13,6 +13,7 @@ import { ptBR } from 'date-fns/locale'
 import type { Pasta } from '@/lib/types'
 
 type Tab = 'geral' | 'pasta' | 'receitas'
+type ReportMode = 'periodo' | 'mes'
 const MONTHS_OPTIONS = [3, 6, 12]
 
 export default function RelatoriosPage() {
@@ -30,6 +31,8 @@ export default function RelatoriosPage() {
   const [selectedPasta, setSelectedPasta] = useState('')
   const [pastaData, setPastaData] = useState<any>(null)
   const [loadingPasta, setLoadingPasta] = useState(false)
+  const [reportMode, setReportMode] = useState<ReportMode>('periodo')
+  const [specificMonth, setSpecificMonth] = useState(format(new Date(), 'yyyy-MM'))
 
   const loadGeral = useCallback(async () => {
     setLoading(true)
@@ -40,8 +43,15 @@ export default function RelatoriosPage() {
     const months: any[] = []
     let sumRec = 0, sumDesp = 0
 
-    for (let i = period - 1; i >= 0; i--) {
-      const monthDate = subMonths(now, i)
+    let monthDates: Date[]
+    if (reportMode === 'mes') {
+      const [y, m] = specificMonth.split('-').map(Number)
+      monthDates = [new Date(y, m - 1, 1)]
+    } else {
+      monthDates = Array.from({ length: period }, (_, i) => subMonths(now, period - 1 - i))
+    }
+
+    for (const monthDate of monthDates) {
       const start = format(startOfMonth(monthDate), 'yyyy-MM-dd')
       const end = format(endOfMonth(monthDate), 'yyyy-MM-dd')
       const label = format(monthDate, 'MMM/yy', { locale: ptBR })
@@ -54,10 +64,10 @@ export default function RelatoriosPage() {
     setMonthlyData(months)
     setTotalReceitas(sumRec)
     setTotalDespesas(sumDesp)
-    setSaldoMedio(period > 0 ? (sumRec - sumDesp) / period : 0)
+    setSaldoMedio(monthDates.length > 0 ? (sumRec - sumDesp) / monthDates.length : 0)
 
-    const start = format(startOfMonth(subMonths(now, period - 1)), 'yyyy-MM-dd')
-    const end = format(endOfMonth(now), 'yyyy-MM-dd')
+    const start = format(startOfMonth(monthDates[0]), 'yyyy-MM-dd')
+    const end = format(endOfMonth(monthDates[monthDates.length - 1]), 'yyyy-MM-dd')
 
     const { data: catTxsDesp } = await supabase.from('transacoes').select('valor, categorias(nome, cor)').eq('user_id', user.id).eq('tipo', 'despesa').gte('data', start).lte('data', end).eq('status', 'pago')
     const catDesp: Record<string, { value: number; color: string }> = {}
@@ -82,7 +92,7 @@ export default function RelatoriosPage() {
     const { data: pastasData } = await supabase.from('pastas').select('*').eq('user_id', user.id).order('nome')
     setPastas(pastasData || [])
     setLoading(false)
-  }, [period])
+  }, [period, reportMode, specificMonth])
 
   useEffect(() => { loadGeral() }, [loadGeral])
 
@@ -96,8 +106,15 @@ export default function RelatoriosPage() {
     const months: any[] = []
     let sumRec = 0, sumDesp = 0
 
-    for (let i = period - 1; i >= 0; i--) {
-      const monthDate = subMonths(now, i)
+    let monthDates: Date[]
+    if (reportMode === 'mes') {
+      const [y, m] = specificMonth.split('-').map(Number)
+      monthDates = [new Date(y, m - 1, 1)]
+    } else {
+      monthDates = Array.from({ length: period }, (_, i) => subMonths(now, period - 1 - i))
+    }
+
+    for (const monthDate of monthDates) {
       const start = format(startOfMonth(monthDate), 'yyyy-MM-dd')
       const end = format(endOfMonth(monthDate), 'yyyy-MM-dd')
       const label = format(monthDate, 'MMM/yy', { locale: ptBR })
@@ -108,11 +125,16 @@ export default function RelatoriosPage() {
       months.push({ mes: label, receitas: rec, despesas: desp, saldo: rec - desp })
     }
 
+    const rangeStart = format(startOfMonth(monthDates[0]), 'yyyy-MM-dd')
+    const rangeEnd = format(endOfMonth(monthDates[monthDates.length - 1]), 'yyyy-MM-dd')
+
     const { data: allTxs } = await supabase
       .from('transacoes')
       .select('*, categorias(nome, cor)')
       .eq('user_id', user.id)
       .eq('pasta_id', selectedPasta)
+      .gte('data', rangeStart)
+      .lte('data', rangeEnd)
       .order('data', { ascending: false })
       .order('tipo')
       .limit(200)
@@ -126,7 +148,7 @@ export default function RelatoriosPage() {
     setLoadingPasta(false)
   }
 
-  useEffect(() => { if (tab === 'pasta' && selectedPasta) loadPastaReport() }, [selectedPasta, tab, period])
+  useEffect(() => { if (tab === 'pasta' && selectedPasta) loadPastaReport() }, [selectedPasta, tab, period, reportMode, specificMonth])
 
   function exportCSV(data: any[], filename: string) {
     if (!data.length) return
@@ -185,7 +207,7 @@ export default function RelatoriosPage() {
         'Despesas': `R$ ${d.despesas.toFixed(2).replace('.', ',')}`,
         'Saldo': `R$ ${d.saldo.toFixed(2).replace('.', ',')}`,
       })),
-      `relatorio-geral-${period}meses.csv`
+      reportMode === 'mes' ? `relatorio-${specificMonth}.csv` : `relatorio-geral-${period}meses.csv`
     )
   }
 
@@ -198,7 +220,9 @@ export default function RelatoriosPage() {
     if (tab === 'geral') {
       const saldoTotal = totalReceitas - totalDespesas
       title = 'Relatório Geral'
-      subtitle = `Últimos ${period} meses`
+      subtitle = reportMode === 'mes'
+        ? format(new Date(Number(specificMonth.split('-')[0]), Number(specificMonth.split('-')[1]) - 1, 1), 'MMMM yyyy', { locale: ptBR }).replace(/^\w/, c => c.toUpperCase())
+        : `Últimos ${period} meses`
       bodyContent = `
         <div class="kpi-row">
           <div class="kpi kv">
@@ -257,7 +281,9 @@ export default function RelatoriosPage() {
     } else if (tab === 'pasta' && pastaData) {
       const saldoPasta = pastaData.sumRec - pastaData.sumDesp
       title = pastaData.pastaNome
-      subtitle = `Últimos ${period} meses`
+      subtitle = reportMode === 'mes'
+        ? format(new Date(Number(specificMonth.split('-')[0]), Number(specificMonth.split('-')[1]) - 1, 1), 'MMMM yyyy', { locale: ptBR }).replace(/^\w/, c => c.toUpperCase())
+        : `Últimos ${period} meses`
       bodyContent = `
         <div class="kpi-row">
           <div class="kpi kv">
@@ -306,7 +332,9 @@ export default function RelatoriosPage() {
       `
     } else if (tab === 'receitas') {
       title = 'Receitas por Categoria'
-      subtitle = `Últimos ${period} meses`
+      subtitle = reportMode === 'mes'
+        ? format(new Date(Number(specificMonth.split('-')[0]), Number(specificMonth.split('-')[1]) - 1, 1), 'MMMM yyyy', { locale: ptBR }).replace(/^\w/, c => c.toUpperCase())
+        : `Últimos ${period} meses`
       bodyContent = `
         <table>
           <thead><tr><th>Categoria</th><th class="ar">Valor</th><th class="ar">%</th></tr></thead>
@@ -449,13 +477,29 @@ export default function RelatoriosPage() {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex bg-[#18181b] border border-zinc-800 rounded-xl p-1">
-            {MONTHS_OPTIONS.map(m => (
-              <button key={m} onClick={() => setPeriod(m)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${period === m ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'}`}>
-                {m}M
-              </button>
-            ))}
+            <button onClick={() => setReportMode('periodo')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${reportMode === 'periodo' ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'}`}>
+              Período
+            </button>
+            <button onClick={() => setReportMode('mes')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${reportMode === 'mes' ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'}`}>
+              Mês
+            </button>
           </div>
+          {reportMode === 'periodo' && (
+            <div className="flex bg-[#18181b] border border-zinc-800 rounded-xl p-1">
+              {MONTHS_OPTIONS.map(m => (
+                <button key={m} onClick={() => setPeriod(m)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${period === m ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'}`}>
+                  {m}M
+                </button>
+              ))}
+            </div>
+          )}
+          {reportMode === 'mes' && (
+            <input type="month" value={specificMonth} onChange={e => setSpecificMonth(e.target.value)}
+              className="bg-[#18181b] border border-zinc-800 rounded-xl px-3 py-2 text-zinc-300 text-sm focus:outline-none focus:border-indigo-500" />
+          )}
           {tab === 'geral' && (
             <button onClick={exportGeralReport}
               className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-2 rounded-xl text-sm font-medium transition-colors border border-zinc-700">
@@ -490,15 +534,15 @@ export default function RelatoriosPage() {
             <div className="bg-[#18181b] border border-zinc-800 rounded-2xl p-4">
               <div className="flex items-center gap-2 mb-2"><TrendingUp className="w-4 h-4 text-green-400" /><span className="text-xs text-zinc-500">Total Receitas</span></div>
               <p className="text-base md:text-xl font-bold text-green-400">{formatCurrencyCompact(totalReceitas)}</p>
-              <p className="text-xs text-zinc-600 mt-0.5">{period} meses</p>
+              <p className="text-xs text-zinc-600 mt-0.5">{reportMode === 'mes' ? 'mês selecionado' : `${period} meses`}</p>
             </div>
             <div className="bg-[#18181b] border border-zinc-800 rounded-2xl p-4">
               <div className="flex items-center gap-2 mb-2"><TrendingDown className="w-4 h-4 text-rose-400" /><span className="text-xs text-zinc-500">Total Despesas</span></div>
               <p className="text-base md:text-xl font-bold text-rose-400">{formatCurrencyCompact(totalDespesas)}</p>
-              <p className="text-xs text-zinc-600 mt-0.5">{period} meses</p>
+              <p className="text-xs text-zinc-600 mt-0.5">{reportMode === 'mes' ? 'mês selecionado' : `${period} meses`}</p>
             </div>
             <div className="bg-[#18181b] border border-zinc-800 rounded-2xl p-4">
-              <div className="flex items-center gap-2 mb-2"><Wallet className={`w-4 h-4 ${saldoMedio >= 0 ? 'text-blue-400' : 'text-rose-400'}`} /><span className="text-xs text-zinc-500">Saldo médio/mês</span></div>
+              <div className="flex items-center gap-2 mb-2"><Wallet className={`w-4 h-4 ${saldoMedio >= 0 ? 'text-blue-400' : 'text-rose-400'}`} /><span className="text-xs text-zinc-500">{reportMode === 'mes' ? 'Saldo do mês' : 'Saldo médio/mês'}</span></div>
               <p className={`text-base md:text-xl font-bold ${saldoMedio >= 0 ? 'text-blue-400' : 'text-rose-400'}`}>{formatCurrencyCompact(saldoMedio)}</p>
               <p className="text-xs text-zinc-600 mt-0.5">{totalReceitas - totalDespesas >= 0 ? 'superávit' : 'déficit'}</p>
             </div>
@@ -586,7 +630,7 @@ export default function RelatoriosPage() {
                 <Download className="w-3.5 h-3.5" />Exportar
               </button>
             </div>
-            <p className="text-xs text-zinc-500 mb-6">Últimos {period} meses — total: {formatCurrencyCompact(totalReceitas)}</p>
+            <p className="text-xs text-zinc-500 mb-6">{reportMode === 'mes' ? 'Mês selecionado' : `Últimos ${period} meses`} — total: {formatCurrencyCompact(totalReceitas)}</p>
             {categoryRecData.length > 0 ? (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <ResponsiveContainer width="100%" height={220}>
