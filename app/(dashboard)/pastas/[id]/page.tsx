@@ -10,12 +10,22 @@ import {
   ChevronLeft, ChevronRight, Tag as TagIcon, CreditCard, Repeat
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { format, parseISO, startOfMonth, endOfMonth, subMonths, addMonths } from 'date-fns'
+import { format, parseISO, startOfMonth, endOfMonth, subMonths, addMonths, addWeeks } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import type { Transaction, Category, Tag } from '@/lib/types'
 
 type Tab = 'todas' | 'receitas' | 'despesas' | 'recorrentes'
 type RecurrenceMode = 'none' | 'parcelado' | 'fixo'
+
+function getInstallDate(baseDate: string, index: number, periodo: string): string {
+  const base = parseISO(baseDate)
+  switch (periodo) {
+    case 'semanal': return format(addWeeks(base, index), 'yyyy-MM-dd')
+    case 'quinzenal': return format(addWeeks(base, index * 2), 'yyyy-MM-dd')
+    case 'trimestral': return format(addMonths(base, index * 3), 'yyyy-MM-dd')
+    default: return format(addMonths(base, index), 'yyyy-MM-dd')
+  }
+}
 
 function getMonthKey(date: Date) {
   return format(date, 'yyyy-MM')
@@ -54,6 +64,7 @@ export default function PastaDetailPage() {
   const [notas, setNotas] = useState('')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [parcelasCustom, setParcelasCustom] = useState<string[]>([])
 
   const loadData = useCallback(async () => {
     const { data: pastaData } = await supabase.from('pastas').select('*').eq('id', id).single()
@@ -95,6 +106,14 @@ export default function PastaDetailPage() {
     }
   }, [numeroParcelas, data, recurrenceMode])
 
+  // Initialize per-installment values when count or base value changes
+  useEffect(() => {
+    if (recurrenceMode !== 'parcelado') { setParcelasCustom([]); return }
+    const n = parseInt(numeroParcelas)
+    if (!n || n < 2 || !valor) { setParcelasCustom([]); return }
+    setParcelasCustom(Array.from({ length: n }, () => valor))
+  }, [numeroParcelas, valor, recurrenceMode])
+
   function resetForm() {
     setTipo('despesa')
     setDescricao('')
@@ -108,6 +127,7 @@ export default function PastaDetailPage() {
     setStatus('pago')
     setNotas('')
     setSelectedTags([])
+    setParcelasCustom([])
     setEditingTx(null)
   }
 
@@ -152,6 +172,41 @@ export default function PastaDetailPage() {
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
+
+    // Parcelado: cria N transações individuais com valores editáveis
+    if (!editingTx && recurrenceMode === 'parcelado' && parcelasCustom.length >= 2) {
+      const n = parcelasCustom.length
+      const inserts = parcelasCustom.map((v, i) => ({
+        user_id: user.id,
+        pasta_id: id as string,
+        categoria_id: categoriaId || null,
+        tipo,
+        descricao: `${descricao} (${i + 1}/${n})`,
+        valor: parseFloat(v) > 0 ? parseFloat(v) : numValor,
+        data: getInstallDate(data, i, periodo),
+        status,
+        recorrente: false,
+        periodo_recorrencia: null,
+        data_inicio_recorrencia: null,
+        data_fim_recorrencia: null,
+        notas: notas || null,
+      }))
+
+      const { data: newTxs, error } = await supabase.from('transacoes').insert(inserts).select()
+      if (error) { toast.error('Erro ao salvar'); setSaving(false); return }
+
+      if (selectedTags.length > 0 && newTxs?.length) {
+        await supabase.from('transacao_tags').insert(
+          newTxs.flatMap((tx: any) => selectedTags.map(tagId => ({ transacao_id: tx.id, tag_id: tagId })))
+        )
+      }
+
+      toast.success(`${n} parcelas criadas!`)
+      setShowForm(false)
+      loadData()
+      setSaving(false)
+      return
+    }
 
     const isRecurrent = recurrenceMode !== 'none'
     const payload = {
@@ -393,6 +448,7 @@ export default function PastaDetailPage() {
           <div className="divide-y divide-zinc-800/50">
             {filtered.map(tx => {
               const txTags = (tx as any).transacao_tags?.map((tt: any) => tt.tags).filter(Boolean) || []
+              const parcelMatch = tx.descricao.match(/\((\d+)\/(\d+)\)$/)
               return (
                 <div key={tx.id} className="flex items-start gap-3 px-4 py-3.5 hover:bg-zinc-800/20 transition-colors">
                   <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 ${tx.tipo === 'receita' ? 'bg-green-500/10' : 'bg-rose-500/10'}`}>
@@ -403,11 +459,15 @@ export default function PastaDetailPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
-                      <span className="text-sm font-medium text-zinc-200">{tx.descricao}</span>
+                      <span className="text-sm font-medium text-zinc-200">{parcelMatch ? tx.descricao.replace(/\s*\(\d+\/\d+\)$/, '') : tx.descricao}</span>
                       {(tx as any).isProjected && (
                         <span className="text-[10px] text-zinc-500 bg-zinc-800 border border-zinc-700 px-1.5 py-0.5 rounded-md">Projeção</span>
                       )}
-                      {tx.recorrente && (
+                      {parcelMatch ? (
+                        <span className="flex items-center gap-1 text-[10px] text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-1.5 py-0.5 rounded-md">
+                          <CreditCard className="w-2.5 h-2.5" />{parcelMatch[1]}/{parcelMatch[2]}
+                        </span>
+                      ) : tx.recorrente && (
                         <span className="flex items-center gap-1 text-[10px] text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-1.5 py-0.5 rounded-md">
                           {tx.data_fim_recorrencia ? <CreditCard className="w-2.5 h-2.5" /> : <Repeat className="w-2.5 h-2.5" />}
                           {tx.data_fim_recorrencia ? 'Parcelado' : recurrencePeriodLabel(tx.periodo_recorrencia!)}
@@ -586,29 +646,51 @@ export default function PastaDetailPage() {
               </div>
 
               {recurrenceMode === 'parcelado' && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-300 mb-2">Nº de parcelas</label>
-                    <input type="number" min="2" max="360" value={numeroParcelas} onChange={e => setNumeroParcelas(e.target.value)}
-                      placeholder="12"
-                      className="w-full bg-[#1c1c1f] border border-zinc-700 rounded-xl px-4 py-3 text-zinc-100 placeholder-zinc-500 text-sm focus:outline-none focus:border-indigo-500" />
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-300 mb-2">Nº de parcelas</label>
+                      <input type="number" min="2" max="360" value={numeroParcelas} onChange={e => setNumeroParcelas(e.target.value)}
+                        placeholder="12"
+                        className="w-full bg-[#1c1c1f] border border-zinc-700 rounded-xl px-4 py-3 text-zinc-100 placeholder-zinc-500 text-sm focus:outline-none focus:border-indigo-500" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-300 mb-2">Período</label>
+                      <select value={periodo} onChange={e => setPeriodo(e.target.value)}
+                        className="w-full bg-[#1c1c1f] border border-zinc-700 rounded-xl px-4 py-3 text-zinc-100 text-sm focus:outline-none focus:border-indigo-500">
+                        <option value="semanal">Semanal</option>
+                        <option value="quinzenal">Quinzenal</option>
+                        <option value="mensal">Mensal</option>
+                        <option value="trimestral">Trimestral</option>
+                      </select>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-300 mb-2">Período</label>
-                    <select value={periodo} onChange={e => setPeriodo(e.target.value)}
-                      className="w-full bg-[#1c1c1f] border border-zinc-700 rounded-xl px-4 py-3 text-zinc-100 text-sm focus:outline-none focus:border-indigo-500">
-                      <option value="semanal">Semanal</option>
-                      <option value="quinzenal">Quinzenal</option>
-                      <option value="mensal">Mensal</option>
-                      <option value="trimestral">Trimestral</option>
-                    </select>
-                  </div>
-                  {dataFim && (
-                    <div className="col-span-2 bg-indigo-500/5 border border-indigo-500/20 rounded-xl p-3 text-xs text-zinc-400">
+                  {!editingTx && parcelasCustom.length >= 2 && data ? (
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-medium text-zinc-400">Valor por parcela <span className="text-zinc-600">(edite individualmente)</span></span>
+                        <span className="text-xs text-zinc-500">Total: {formatCurrencyCompact(parcelasCustom.reduce((s, v) => s + (parseFloat(v) || 0), 0))}</span>
+                      </div>
+                      <div className="max-h-44 overflow-y-auto rounded-xl border border-zinc-700 divide-y divide-zinc-800/70 bg-[#1c1c1f]">
+                        {parcelasCustom.map((v, i) => (
+                          <div key={i} className="flex items-center gap-2 px-3 py-2">
+                            <span className="text-[10px] text-indigo-400 font-semibold w-10 flex-shrink-0">{i + 1}/{parcelasCustom.length}</span>
+                            <span className="text-[10px] text-zinc-500 flex-1">{formatDateShort(getInstallDate(data, i, periodo))}</span>
+                            <input
+                              type="number" step="0.01" min="0.01" value={v}
+                              onChange={e => { const a = [...parcelasCustom]; a[i] = e.target.value; setParcelasCustom(a) }}
+                              className="w-24 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-zinc-100 text-xs text-right focus:outline-none focus:border-indigo-500"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : dataFim ? (
+                    <div className="bg-indigo-500/5 border border-indigo-500/20 rounded-xl p-3 text-xs text-zinc-400">
                       Última parcela em: <span className="text-indigo-400 font-semibold">{formatDateShort(dataFim)}</span>
                       {numeroParcelas && ` · ${numeroParcelas}× de ${valor ? formatCurrencyCompact(parseFloat(valor.replace(',', '.'))) : '—'}`}
                     </div>
-                  )}
+                  ) : null}
                 </div>
               )}
 
