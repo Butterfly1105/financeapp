@@ -138,6 +138,7 @@ create table if not exists transacoes (
   data_inicio_recorrencia date,
   data_fim_recorrencia date,
   status text check (status in ('pendente', 'pago', 'cancelado')) default 'pago',
+  status_overrides jsonb default '{}',
   notas text,
   created_at timestamptz default now(),
   updated_at timestamptz default now()

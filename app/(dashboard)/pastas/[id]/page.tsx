@@ -341,6 +341,17 @@ export default function PastaDetailPage() {
     )
   }
 
+  async function handleStatusOverride(txId: string, newStatus: 'pago' | 'pendente' | null) {
+    const tx = transactions.find(t => t.id === txId)
+    if (!tx) return
+    const overrides: Record<string, string> = { ...((tx as any).status_overrides || {}) }
+    if (newStatus === null) delete overrides[monthKey]
+    else overrides[monthKey] = newStatus
+    const { error } = await supabase.from('transacoes').update({ status_overrides: overrides }).eq('id', txId)
+    if (error) { toast.error('Erro ao atualizar status'); return }
+    setTransactions(prev => prev.map(t => t.id === txId ? { ...t, status_overrides: overrides } as any : t))
+  }
+
   // Month key for filtering
   const monthKey = getMonthKey(selectedMonth)
 
@@ -383,7 +394,7 @@ export default function PastaDetailPage() {
         if (diffMonths % periodMonths !== 0) continue
       }
 
-      projected.push({ ...tx, isProjected: true } as any)
+      projected.push({ ...tx, isProjected: true, status: ((tx as any).status_overrides?.[monthKey] ?? null) } as any)
     }
 
     return [...actual, ...projected]
@@ -551,11 +562,27 @@ export default function PastaDetailPage() {
                           {tx.data_fim_recorrencia ? 'Parcelado' : recurrencePeriodLabel(tx.periodo_recorrencia!)}
                         </span>
                       )}
-                      {tx.status === 'pago' && (
-                        <span className="text-[10px] text-green-400 bg-green-500/10 border border-green-500/20 px-1.5 py-0.5 rounded-md">Pago</span>
-                      )}
-                      {tx.status === 'pendente' && (
-                        <span className="text-[10px] text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 px-1.5 py-0.5 rounded-md">Pendente</span>
+                      {(tx as any).isProjected ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const cur = tx.status as string | null
+                            const next = !cur ? 'pago' : cur === 'pago' ? 'pendente' : null
+                            handleStatusOverride(tx.id, next as any)
+                          }}
+                          className={`text-[10px] px-1.5 py-0.5 rounded-md border transition-all cursor-pointer ${
+                            tx.status === 'pago' ? 'text-green-400 bg-green-500/10 border-green-500/20 hover:bg-green-500/20' :
+                            tx.status === 'pendente' ? 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20 hover:bg-yellow-500/20' :
+                            'text-zinc-500 bg-zinc-800/50 border-zinc-700 hover:bg-zinc-700'
+                          }`}
+                        >
+                          {tx.status === 'pago' ? 'Pago' : tx.status === 'pendente' ? 'Pendente' : '+ Marcar'}
+                        </button>
+                      ) : (
+                        <>
+                          {tx.status === 'pago' && <span className="text-[10px] text-green-400 bg-green-500/10 border border-green-500/20 px-1.5 py-0.5 rounded-md">Pago</span>}
+                          {tx.status === 'pendente' && <span className="text-[10px] text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 px-1.5 py-0.5 rounded-md">Pendente</span>}
+                        </>
                       )}
                       {(tx as any).categorias && (
                         <span

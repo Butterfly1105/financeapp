@@ -5,10 +5,12 @@ import { createClient } from '@/lib/supabase/client'
 import { formatCurrency, formatCurrencyCompact, formatDateShort } from '@/lib/utils'
 import {
   Plus, Search, ArrowUpRight, ArrowDownRight, RefreshCw,
-  X, Edit2, Trash2, Tag as TagIcon, CreditCard, Repeat
+  X, Edit2, Trash2, Tag as TagIcon, CreditCard, Repeat,
+  ChevronLeft, ChevronRight
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { format, addMonths, addWeeks, parseISO } from 'date-fns'
+import { format, addMonths, subMonths, addWeeks, parseISO } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
 import type { Transaction, Category, Pasta, Tag } from '@/lib/types'
 
 type RecurrenceMode = 'none' | 'parcelado' | 'fixo'
@@ -32,7 +34,8 @@ export default function TransacoesPage() {
   const [tagsAvailable, setTagsAvailable] = useState<Tag[]>([])
   const [search, setSearch] = useState('')
   const [filterTipo, setFilterTipo] = useState<'todas' | 'receita' | 'despesa'>('todas')
-  const [filterMes, setFilterMes] = useState('')
+  const [filterMesDate, setFilterMesDate] = useState<Date | null>(null)
+  const filterMes = filterMesDate ? format(filterMesDate, 'yyyy-MM') : ''
   const [filterCategoria, setFilterCategoria] = useState('')
   const [filterTag, setFilterTag] = useState('')
   const [showForm, setShowForm] = useState(false)
@@ -307,10 +310,39 @@ export default function TransacoesPage() {
     )
   }
 
-  const filtered = transactions.filter(t => {
+  function getProjectedTransactions(): (Transaction & { isProjected?: boolean })[] {
+    if (!filterMes) return transactions
+
+    const periodToMonths: Record<string, number> = {
+      mensal: 1, bimestral: 2, trimestral: 3, semestral: 6, anual: 12,
+    }
+    const actual = transactions.filter(t => t.data.startsWith(filterMes))
+    const projected: (Transaction & { isProjected?: boolean })[] = []
+
+    for (const tx of transactions) {
+      if (!tx.recorrente) continue
+      if (tx.data.startsWith(filterMes)) continue
+      const startKey = tx.data.substring(0, 7)
+      if (startKey > filterMes) continue
+      if (tx.data_fim_recorrencia && tx.data_fim_recorrencia.substring(0, 7) < filterMes) continue
+      const periodo = tx.periodo_recorrencia || 'mensal'
+      const periodMonths = periodToMonths[periodo]
+      if (periodMonths !== undefined) {
+        const [sy, sm] = startKey.split('-').map(Number)
+        const [my, mm] = filterMes.split('-').map(Number)
+        const diffMonths = (my - sy) * 12 + (mm - sm)
+        if (diffMonths % periodMonths !== 0) continue
+      }
+      projected.push({ ...tx, isProjected: true, status: ((tx as any).status_overrides?.[filterMes] ?? null) } as any)
+    }
+
+    return [...actual, ...projected]
+  }
+
+  const withProjected = getProjectedTransactions()
+  const filtered = withProjected.filter(t => {
     if (filterTipo !== 'todas' && t.tipo !== filterTipo) return false
     if (search && !t.descricao.toLowerCase().includes(search.toLowerCase())) return false
-    if (filterMes && !t.data.startsWith(filterMes)) return false
     if (filterCategoria && t.categoria_id !== filterCategoria) return false
     if (filterTag) {
       const txTagIds = (t as any).transacao_tags?.map((tt: any) => tt.tags?.id).filter(Boolean) || []
@@ -376,10 +408,21 @@ export default function TransacoesPage() {
           <option value="receita">Receitas</option>
           <option value="despesa">Despesas</option>
         </select>
-        <div className="flex items-center gap-2 bg-[#18181b] border border-zinc-800 rounded-xl px-3 py-2 focus-within:border-indigo-500 transition-colors">
-          <span className="text-xs text-zinc-500 flex-shrink-0">Período</span>
-          <input type="month" value={filterMes} onChange={e => setFilterMes(e.target.value)}
-            className="bg-transparent text-zinc-300 text-sm focus:outline-none" />
+        <div className="flex items-center bg-[#18181b] border border-zinc-800 rounded-xl overflow-hidden">
+          <button type="button" onClick={() => setFilterMesDate(d => subMonths(d ?? new Date(), 1))}
+            className="p-2.5 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors flex-shrink-0">
+            <ChevronLeft className="w-3.5 h-3.5" />
+          </button>
+          <button type="button" onClick={() => setFilterMesDate(null)}
+            className={`text-xs font-medium transition-colors whitespace-nowrap w-[88px] text-center py-2.5 ${filterMesDate ? 'text-zinc-200' : 'text-zinc-500'}`}>
+            {filterMesDate
+              ? format(filterMesDate, 'MMM yyyy', { locale: ptBR }).replace(/^\w/, c => c.toUpperCase())
+              : 'Todos'}
+          </button>
+          <button type="button" onClick={() => setFilterMesDate(d => addMonths(d ?? new Date(), 1))}
+            className="p-2.5 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors flex-shrink-0">
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
         </div>
         <select value={filterCategoria} onChange={e => setFilterCategoria(e.target.value)}
           className="bg-[#18181b] border border-zinc-800 rounded-xl px-3 py-2.5 text-zinc-300 text-sm focus:outline-none focus:border-indigo-500">
@@ -394,7 +437,7 @@ export default function TransacoesPage() {
           </select>
         )}
         {(search || filterTipo !== 'todas' || filterMes || filterCategoria || filterTag) && (
-          <button onClick={() => { setSearch(''); setFilterTipo('todas'); setFilterMes(''); setFilterCategoria(''); setFilterTag('') }}
+          <button onClick={() => { setSearch(''); setFilterTipo('todas'); setFilterMesDate(null); setFilterCategoria(''); setFilterTag('') }}
             className="flex items-center gap-1.5 bg-zinc-800 text-zinc-400 hover:text-zinc-200 px-3 py-2.5 rounded-xl text-sm transition-colors">
             <X className="w-3.5 h-3.5" />Limpar
           </button>
@@ -433,6 +476,9 @@ export default function TransacoesPage() {
                           {tx.data_fim_recorrencia ? <CreditCard className="w-2.5 h-2.5" /> : <Repeat className="w-2.5 h-2.5" />}
                           {tx.data_fim_recorrencia ? 'Parcelado' : 'Fixo'}
                         </span>
+                      )}
+                      {(tx as any).isProjected && (
+                        <span className="text-[10px] text-zinc-500 bg-zinc-800 border border-zinc-700 px-1.5 py-0.5 rounded-md">Projeção</span>
                       )}
                       {tx.status === 'pago' && (
                         <span className="text-[10px] text-green-400 bg-green-500/10 border border-green-500/20 px-1.5 py-0.5 rounded-md">Pago</span>

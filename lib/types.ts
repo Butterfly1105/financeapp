@@ -56,7 +56,8 @@ export interface Transaction {
   periodo_recorrencia: RecurrencePeriod | null
   data_inicio_recorrencia: string | null
   data_fim_recorrencia: string | null
-  status: TransactionStatus
+  status: TransactionStatus | null
+  status_overrides?: Record<string, string>
   notas: string | null
   created_at: string
   updated_at: string
